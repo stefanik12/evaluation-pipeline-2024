@@ -136,14 +136,13 @@ class TaskManager:
             if "include" in config:
                 if yaml_path is None:
                     raise ValueError
-                config = {
-                    **utils.load_yaml_config(
+                config.update(
+                    utils.load_yaml_config(
                         yaml_path,
                         yaml_config={"include": config.pop("include")},
                         mode="full",
-                    ),
-                    **config,
-                }
+                    )
+                )
             if self._config_is_python_task(config):
                 task_object = config["class"]()
             else:

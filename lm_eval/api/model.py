@@ -321,7 +321,13 @@ class TemplateLM(LM):
         self, requests, disable_tqdm: bool = False
     ) -> List[Tuple[float, bool]]:
         new_reqs = []
-        for context, continuation in [req.args for req in requests]:
+        for req in requests:
+            if len(req.args) == 2:
+                context, continuation = req.args
+                image_id = None
+                image_key = None
+            elif len(req.args) == 4:
+                context, continuation, image_id, image_key = req.args
             if context == "":
                 # BOS or EOS as context
                 context_enc, continuation_enc = (
@@ -331,7 +337,7 @@ class TemplateLM(LM):
             else:
                 context_enc, continuation_enc = self._encode_pair(context, continuation)
 
-            new_reqs.append(((context, continuation), context_enc, continuation_enc))
+            new_reqs.append(((context, continuation), context_enc, continuation_enc, image_id, image_key))
 
         return self._loglikelihood_tokens(new_reqs, disable_tqdm=disable_tqdm)
 

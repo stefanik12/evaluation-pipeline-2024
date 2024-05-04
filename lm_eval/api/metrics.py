@@ -335,6 +335,59 @@ def acc_all_stderr(items):
     return acc
 
 
+@register_metric(
+    metric="acc_paired",
+    higher_is_better=True,
+    output_type=["multiple_choice", "loglikelihood"],
+    aggregation="mean",
+)
+def acc_paired(items):
+    # Only count as correct if each pair of answers is correct
+    unzipped_list = list(zip(*items))
+    golds = unzipped_list[0]
+    print(golds)
+    preds = unzipped_list[1]
+    print(preds)
+    corrects = 0
+    total = 0
+
+    is_correct = False
+    for idx, (gold, pred) in enumerate(zip(golds, preds)):
+        if gold == pred and idx % 2 == 0:
+            is_correct = True
+            continue
+        if idx % 2 == 1:
+            total += 1
+            if gold == pred and is_correct:
+                corrects += 1
+        is_correct = False
+    
+    return corrects / total
+
+def acc_paired_stderr(items):
+    # Only count as correct if all answers are labeled correctly for each question
+    unzipped_list = list(zip(*items))
+    golds = unzipped_list[0]
+    preds = unzipped_list[1]
+    scores = []
+
+    is_correct = False
+    for idx, (gold, pred) in enumerate(zip(golds, preds)):
+        if gold == pred and idx % 2 == 0:
+            is_correct = True
+            continue
+        if idx % 2 == 1:
+            total += 1
+            if gold == pred and is_correct:
+                scores.append(1)
+            else:
+                scores.append(0)
+        is_correct = False
+
+    acc = mean_stderr(scores)
+    return acc
+
+
 def metric_max_over_ground_truths(metric_fn, prediction, ground_truths):
     """Compute max metric between prediction and each ground truth."""
     scores_for_ground_truths = []
@@ -441,9 +494,11 @@ def stderr_for_metric(metric, bootstrap_iters):
 
     if metric in bootstrappable:
         return lambda x: bootstrap_stderr(metric, x, iters=bootstrap_iters)
+    if metric == acc_paired:
+        stderr = {mean: mean_stderr, acc_paired: acc_paired_stderr}
+        return stderr.get(metric, None)
 
     stderr = {mean: mean_stderr, acc_all: acc_all_stderr}
-
     return stderr.get(metric, None)
 
 

@@ -64,8 +64,10 @@ class TaskConfig(dict):
     dataset_path: Optional[str] = None
     dataset_name: Optional[str] = None
     dataset_kwargs: Optional[dict] = None
+    # source_dataset_path: Optional[dict] = None
     training_split: Optional[str] = None
     validation_split: Optional[str] = None
+    source_validation_split: Optional[str] = None
     test_split: Optional[str] = None
     fewshot_split: Optional[
         str
@@ -73,6 +75,9 @@ class TaskConfig(dict):
     # formatting / prompting options.
     # see docs/advanced_task_guide.md for more info
     process_docs: Optional[Callable] = None
+    doc_to_image_id: Optional[Union[Callable, str]] = None
+    doc_to_image_key: Optional[Union[Callable, str]] = None
+    doc_to_image: Optional[Union[Callable, str]] = None
     doc_to_text: Optional[Union[Callable, str]] = None
     doc_to_target: Optional[Union[Callable, str]] = None
     doc_to_choice: Optional[Union[Callable, str, dict, list]] = None
@@ -99,7 +104,7 @@ class TaskConfig(dict):
     def __post_init__(self) -> None:
         if self.generation_kwargs is not None:
             if self.output_type != "generate_until":
-                eval_logger.warning(
+                raise ValueError(
                     f"[{self.task}] passed `generation_kwargs`, but not using `output_type: generate_until`!"
                 )
 
@@ -191,6 +196,8 @@ class Task(abc.ABC):
     # The name of a subset within `DATASET_PATH`.
     DATASET_NAME: Optional[str] = None
 
+    # SOURCE_DATASET_PATH: Optional[str] = None
+
     OUTPUT_TYPE: Optional[OutputType] = None
 
     def __init__(
@@ -268,6 +275,14 @@ class Task(abc.ABC):
             download_mode=download_mode,
         )
 
+        # if self.SOURCE_DATASET_PATH:
+        #     self.source_dataset = datasets.load_dataset(
+        #         path=self.SOURCE_DATASET_PATH,
+        #         data_dir=data_dir,
+        #         cache_dir=cache_dir,
+        #         download_mode=download_mode
+        #     )
+
     @property
     def config(self) -> TaskConfig:
         """Returns the TaskConfig associated with this class."""
@@ -296,6 +311,13 @@ class Task(abc.ABC):
         return []
 
     def validation_docs(self) -> Iterable:
+        """
+        :return: Iterable[obj]
+            A iterable of any object, that doc_to_text can handle
+        """
+        return []
+
+    def source_validation_docs(self) -> Iterable:
         """
         :return: Iterable[obj]
             A iterable of any object, that doc_to_text can handle
@@ -701,6 +723,9 @@ class ConfigurableTask(Task):
         if self.config.dataset_name is not None:
             self.DATASET_NAME = self.config.dataset_name
 
+        # if self.config.source_dataset_path is not None:
+        #     self.SOURCE_DATASET_PATH = self.config.source_dataset_path
+
         self._metric_fn_list = {}
         self._metric_fn_kwargs = {}
         self._aggregation_list = {}
@@ -873,6 +898,10 @@ class ConfigurableTask(Task):
             name=self.DATASET_NAME,
             **dataset_kwargs if dataset_kwargs is not None else {},
         )
+        # if self.SOURCE_DATASET_PATH:
+        #     self.source_dataset = datasets.load_dataset(
+        #         path=self.SOURCE_DATASET_PATH
+        #     )
 
     def has_training_docs(self) -> bool:
         if self.config.training_split is not None:
@@ -913,6 +942,9 @@ class ConfigurableTask(Task):
             if self.config.process_docs is not None:
                 return self.config.process_docs(self.dataset[self.config.test_split])
             return self.dataset[self.config.test_split]
+        
+    def source_validation_docs(self) -> datasets.Dataset:
+        return self.source_dataset[self.config.source_validation_split]
 
     def fewshot_docs(self):
         if self.config.fewshot_split is not None:
@@ -1105,6 +1137,33 @@ class ConfigurableTask(Task):
             return doc_to_choice.get_answer_choices_list(doc)
         else:
             raise TypeError
+        
+    def doc_to_image_id(self, doc: Mapping) -> Union[int, str, list]:
+        image = None
+        if isinstance(self.config.doc_to_image, str):
+            doc_to_image = self.config.doc_to_image
+            if doc_to_image in self.features:
+                image = doc[doc_to_image]
+                return image
+        elif isinstance(self.config.doc_to_image_id, str):
+            doc_to_image_id = int(doc[self.config.doc_to_image_id])
+            return doc_to_image_id
+        # elif isinstance(self.config.doc_to_image_id, int):
+        #     doc_to_image_id = doc[self.config.doc_to_image_id]
+        #     return self.source_validation_docs()[doc_to_image_id]["image"]
+        raise ValueError
+    
+    def doc_to_image_key(self, doc: Mapping) -> Union[int, str, list]:
+        image = None
+        if isinstance(self.config.doc_to_image_key, str):
+            doc_to_image_key = self.config.doc_to_image_key
+            if doc_to_image_key in self.features:
+                image_key = doc[doc_to_image_key]
+                return image_key
+        return "image"
+        # elif isinstance(self.config.doc_to_image_id, int):
+        #     doc_to_image_id = doc[self.config.doc_to_image_id]
+        #     return self.source_validation_docs()[doc_to_image_id]["image"]
 
     def construct_requests(
         self, doc: dict, ctx: str, **kwargs
@@ -1119,12 +1178,22 @@ class ConfigurableTask(Task):
             if self.multiple_input:
                 # If there are multiple inputs, choices are placed in the ctx
                 cont = self.doc_to_target(doc)
-                arguments = [
-                    (ctx + choice, f"{target_delimiter}{cont}") for choice in choices
-                ]
+                if self.config.doc_to_image_id or self.config.doc_to_image:
+                    arguments = [
+                        (ctx + choice, f"{target_delimiter}{cont}", self.doc_to_image_id(doc), self.doc_to_image_key(doc)) for choice in choices
+                    ]
+                else:
+                    arguments = [
+                        (ctx + choice, f"{target_delimiter}{cont}") for choice in choices
+                    ]
             else:
                 # Otherwise they are placed in the continuation
-                arguments = [(ctx, f"{target_delimiter}{cont}") for cont in choices]
+                if self.config.doc_to_image_id or self.config.doc_to_image:
+                    arguments = [
+                        (ctx, f"{target_delimiter}{cont}", self.doc_to_image_id(doc), self.doc_to_image_key(doc)) for cont in choices
+                    ]
+                else:
+                    arguments = [(ctx, f"{target_delimiter}{cont}") for cont in choices]
 
             request_list = [
                 Instance(

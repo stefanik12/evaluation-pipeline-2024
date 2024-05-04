@@ -21,7 +21,7 @@ license = { "text" = "MIT" }
 dependencies = [
     "accelerate>=0.21.0",
     "evaluate",
-    "datasets>=2.16.0",
+    "datasets==2.18.0",
     "evaluate>=0.4.0",
     "jsonlines",
     "numexpr",
@@ -34,11 +34,14 @@ dependencies = [
     "sqlitedict",
     "torch>=1.8",
     "tqdm-multiprocess",
-    "transformers>=4.1",
+    "transformers==4.29",
     "zstandard",
     "dill",
     "word2number",
     "more_itertools",
+    "einops",
+    "einops_exts",
+    "pillow"
 ]
 
 [tool.setuptools.packages.find]

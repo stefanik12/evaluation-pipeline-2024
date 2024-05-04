@@ -5,6 +5,8 @@ from pathlib import Path
 from typing import List, Literal, Optional, Tuple, Union
 
 import torch
+from itertools import chain
+from datasets import load_dataset
 import torch.nn.functional as F
 import transformers
 from accelerate import (
@@ -13,7 +15,6 @@ from accelerate import (
     InitProcessGroupKwargs,
     find_executable_batch_size,
 )
-from huggingface_hub import HfApi
 from packaging import version
 from peft import PeftModel
 from peft import __version__ as PEFT_VERSION
@@ -21,7 +22,9 @@ from tqdm import tqdm
 from transformers.models.auto.modeling_auto import (
     MODEL_FOR_CAUSAL_LM_MAPPING_NAMES,
     MODEL_FOR_SEQ_TO_SEQ_CAUSAL_LM_MAPPING_NAMES,
+    MODEL_FOR_MASKED_LM_MAPPING_NAMES
 )
+from transformers.image_utils import load_image
 
 from lm_eval import utils
 from lm_eval.api.instance import Instance
@@ -67,8 +70,9 @@ def _get_accelerate_args(
 @register_model("hf-auto", "hf", "huggingface")
 class HFLM(TemplateLM):
     """
-    An abstracted Huggingface model class. Enables usage with both models of
-    `transformers.AutoModelForCausalLM` and `transformers.AutoModelForSeq2SeqLM` classes.
+    An abstracted Huggingface model class. Enables usage with models of
+    `transformers.AutoModelForCausalLM`, `transformers.AutoModelForMaskedLM`,
+    and `transformers.AutoModelForSeq2SeqLM` classes.
 
     Supports data-parallel multi-GPU with HF Accelerate.
     """
@@ -79,7 +83,7 @@ class HFLM(TemplateLM):
     def __init__(
         self,
         pretrained: Optional[Union[str, transformers.PreTrainedModel]] = "gpt2",
-        backend: Optional[Literal["default", "causal", "seq2seq"]] = "default",
+        backend: Optional[Literal["default", "causal", "seq2seq", "mlm"]] = "default",
         # override whether the model should be treated as decoder-only (causal) or encoder-decoder (seq2seq)
         revision: Optional[str] = "main",
         subfolder: Optional[str] = None,
@@ -90,6 +94,15 @@ class HFLM(TemplateLM):
                 transformers.PreTrainedTokenizerFast,
             ]
         ] = None,
+        image_processor: Optional[
+            Union[
+                str,
+                transformers.ProcessorMixin
+            ]
+        ] = None,
+        image_src: Optional[str] = None,
+        image_src_split: Optional[str] = None,
+        image_key: Optional[str] = None,
         truncation: Optional[bool] = False,
         logits_cache: bool = True,
         max_length: Optional[int] = None,
@@ -115,6 +128,8 @@ class HFLM(TemplateLM):
         **kwargs,
     ) -> None:
         super().__init__()
+        self.image_processor = None
+
 
         # optionally: take in an already-initialized transformers.PreTrainedModel
         if not isinstance(pretrained, str):
@@ -141,6 +156,20 @@ class HFLM(TemplateLM):
                     trust_remote_code=trust_remote_code,
                     use_fast=use_fast_tokenizer,
                 )
+            
+            if image_processor:
+                assert isinstance(
+                    image_processor, transformers.ProcessorMixin
+                )
+                self.image_processor = image_processor
+            elif image_src:
+                model_name = self._model.name_or_path
+                self.image_processor = transformers.AutoProcessor.from_pretrained(
+                    model_name,
+                    revision=revision,
+                    trust_remote_code=trust_remote_code
+                )
+                
 
         else:
             assert isinstance(device, str)
@@ -243,6 +272,24 @@ class HFLM(TemplateLM):
             use_fast_tokenizer=use_fast_tokenizer,
         )
 
+        if image_processor or image_src:
+            if image_processor is None:
+                image_processor = pretrained
+            self._create_image_processor(
+                pretrained,
+                image_processor,
+                revision=revision,
+                trust_remote_code=trust_remote_code
+            )
+            self.image_src = image_src
+            self.image_key = image_key
+        if image_src:
+            if image_src_split:
+                self.image_src_split = image_src_split
+            else:
+                self.image_src_split = "test"
+            self.image_src = load_dataset(image_src)[self.image_src_split]
+
         self.truncation = truncation
         self.logits_cache = logits_cache
         self.vocab_size = self.tokenizer.vocab_size
@@ -279,10 +326,7 @@ class HFLM(TemplateLM):
             )
 
         self._max_length = max_length
-        self.pretrained = pretrained
-        self.delta = delta
-        self.peft = peft
-        self.revision = revision
+
         self.batch_schedule = 1
         self.batch_sizes = {}
         self.max_batch_size = max_batch_size
@@ -369,6 +413,9 @@ class HFLM(TemplateLM):
     @property
     def eot_token_id(self):
         # we use EOT because end of *text* is more accurate for what we're doing than end of *sentence*
+        if self.tokenizer.eos_token_id is None:
+            self.tokenizer.eos_token_id = self.tokenizer.pad_token_id
+            return self.tokenizer.pad_token_id
         return self.tokenizer.eos_token_id
 
     @property
@@ -378,7 +425,9 @@ class HFLM(TemplateLM):
             return self.custom_prefix_token_id
         if self.tokenizer.bos_token_id is not None:
             return self.tokenizer.bos_token_id
-        return self.tokenizer.eos_token_id
+        if self.tokenizer.eos_token_id is not None:
+            return self.tokenizer.eos_token_id
+        return self.tokenizer.pad_token_id
 
     @property
     def max_length(self):
@@ -417,7 +466,7 @@ class HFLM(TemplateLM):
     def _get_backend(
         self,
         config: Union[transformers.PretrainedConfig, transformers.AutoConfig],
-        backend: Optional[Literal["default", "causal", "seq2seq"]] = "default",
+        backend: Optional[Literal["default", "causal", "seq2seq", "mlm"]] = "default",
         trust_remote_code: Optional[bool] = False,
     ) -> None:
         """
@@ -425,7 +474,7 @@ class HFLM(TemplateLM):
         Determines the backend ("causal" (decoder-only) or "seq2seq" (encoder-decoder))
         model type to be used.
         """
-        assert backend in ["default", "causal", "seq2seq"]
+        assert backend in ["default", "causal", "seq2seq", "mlm"]
 
         if backend != "default":
             # if we've settled on non-default backend, use that manually
@@ -433,12 +482,22 @@ class HFLM(TemplateLM):
                 self.AUTO_MODEL_CLASS = transformers.AutoModelForCausalLM
             elif backend == "seq2seq":
                 self.AUTO_MODEL_CLASS = transformers.AutoModelForSeq2SeqLM
+            elif backend == "mlm":
+                self.AUTO_MODEL_CLASS = transformers.AutoModelForMaskedLM
             eval_logger.info(
                 f"Overrode HF model backend type, and using type '{backend}'"
             )
         else:
             # determine and use the default HF backend for this model, based on its config + metadata.
             if (
+                getattr(config, "model_type")
+                in MODEL_FOR_MASKED_LM_MAPPING_NAMES
+            ):
+                # first check if model type is listed under MLM models, since some
+                # models like Roberta are listed as both masked and causal.
+                # these special cases should be treated as MLMs.
+                self.AUTO_MODEL_CLASS = transformers.AutoModelForMaskedLM
+            elif (
                 getattr(config, "model_type")
                 in MODEL_FOR_SEQ_TO_SEQ_CAUSAL_LM_MAPPING_NAMES
             ):
@@ -453,7 +512,7 @@ class HFLM(TemplateLM):
             else:
                 if not trust_remote_code:
                     eval_logger.warning(
-                        "HF model type is neither marked as CausalLM or Seq2SeqLM. \
+                        "HF model type is neither marked as CausalLM, MaskedLM, or Seq2SeqLM. \
                     This is expected if your model requires `trust_remote_code=True` but may be an error otherwise."
                     )
                 # if model type is neither in HF transformers causal or seq2seq model registries
@@ -463,6 +522,7 @@ class HFLM(TemplateLM):
         assert self.AUTO_MODEL_CLASS in [
             transformers.AutoModelForCausalLM,
             transformers.AutoModelForSeq2SeqLM,
+            transformers.AutoModelForMaskedLM
         ]
         return None
 
@@ -656,6 +716,51 @@ class HFLM(TemplateLM):
                 use_fast=use_fast_tokenizer,
             )
         return None
+    
+    def _create_image_processor(
+        self,
+        pretrained: Union[str, transformers.PreTrainedModel],
+        image_processor: Optional[
+            Union[
+                str,
+                transformers.ProcessorMixin
+            ]
+        ],
+        revision: Optional[str] = "main",
+        trust_remote_code: Optional[bool] = False
+    ) -> None:
+        """
+        Helper method during initialization.
+
+        Create a tokenizer object corresponding to the correct
+        tokenizer for value of `pretrained`, or use the pre-initialized tokenizer passed.
+        """
+
+        if image_processor:
+            if isinstance(image_processor, str):
+                self.image_processor = transformers.AutoProcessor.from_pretrained(
+                    image_processor,
+                    revision=revision,
+                    trust_remote_code=trust_remote_code
+                )
+            else:
+                assert isinstance(
+                    image_processor, transformers.ProcessorMixin
+                )
+                self.image_processor = image_processor
+        else:
+            # Get tokenizer based on 'pretrained'
+            if isinstance(pretrained, str):
+                model_name = pretrained
+            else:
+                # get the HF hub name via accessor on model
+                model_name = self.model.name_or_path
+            self.image_processor = transformers.AutoProcessor.from_pretrained(
+                model_name,
+                revision=revision,
+                trust_remote_code=trust_remote_code
+            )
+        return None
 
     def _detect_batch_size(self, requests=None, pos: int = 0):
         if requests:
@@ -750,7 +855,7 @@ class HFLM(TemplateLM):
         self.tokenizer.padding_side = padding_side
 
         add_special_tokens = {}
-        if self.AUTO_MODEL_CLASS == transformers.AutoModelForCausalLM:
+        if self.AUTO_MODEL_CLASS ==transformers.AutoModelForCausalLM:
             add_special_tokens = {"add_special_tokens": False or self.add_bos_token}
 
         encoding = self.tokenizer(
@@ -772,7 +877,7 @@ class HFLM(TemplateLM):
     def tok_decode(self, tokens, skip_special_tokens=True):
         return self.tokenizer.decode(tokens, skip_special_tokens=skip_special_tokens)
 
-    def _model_call(self, inps, attn_mask=None, labels=None):
+    def _model_call(self, inps, attn_mask=None, labels=None, image_embeds=None):
         """
         :param inps: torch.Tensor
             A torch tensor of shape [batch, (sequence_ctx + sequence_cont)] or of shape
@@ -790,12 +895,15 @@ class HFLM(TemplateLM):
         with torch.no_grad():
             if attn_mask is not None or labels is not None:
                 assert attn_mask is not None and labels is not None
-                assert self.AUTO_MODEL_CLASS == transformers.AutoModelForSeq2SeqLM
+                assert self.AUTO_MODEL_CLASS in (transformers.AutoModelForSeq2SeqLM,
+                                                 transformers.AutoModelForMaskedLM)
                 return self.model(
                     input_ids=inps, attention_mask=attn_mask, labels=labels
                 ).logits
             else:
                 assert self.AUTO_MODEL_CLASS == transformers.AutoModelForCausalLM
+                if image_embeds is not None:
+                    return self.model(inps, pixel_values=image_embeds).logits
                 return self.model(inps).logits
 
     def _model_generate(self, context, max_length, stop, **generation_kwargs):
@@ -835,7 +943,8 @@ class HFLM(TemplateLM):
             # discard right-padding.
             # also discard the input/context tokens. we'll only score continuations.
             logits = logits[inplen - contlen : inplen]
-        elif self.AUTO_MODEL_CLASS == transformers.AutoModelForSeq2SeqLM:
+        elif self.AUTO_MODEL_CLASS in (transformers.AutoModelForSeq2SeqLM,
+                                       transformers.AutoModelForMaskedLM):
             assert (
                 contlen and not inplen
             ), "Selecting scored logits for Seq2SeqLM requires only cont. len"
@@ -928,6 +1037,9 @@ class HFLM(TemplateLM):
         disable_tqdm: bool = False,
         override_bs: int = None,
     ) -> List[Tuple[float, bool]]:
+        assert self.AUTO_MODEL_CLASS != transformers.AutoModelForMaskedLM, \
+            "Used `--model hf-mlm` when model doesn't have an AutoModelForMaskedLM implementation!"
+        
         # TODO: implement some kind of efficient-request-middleware that lumps together requests with the same context
         res = []
 
@@ -949,12 +1061,13 @@ class HFLM(TemplateLM):
             # allows for the creation of a lookup, so we can reuse logits in case of one-token continuations.
             # speeds up some multiple-choice tasks proportionally to the number of choices.
             # groups requests by context+continuation[:-1] and infer on one request/group.
-            return req[-2] + req[-1][:-1]
+            return list(req[-len(req)+1]) + req[-len(req)+2][:-1]
 
         re_ord = Collator(
             requests,
             sort_fn=_collate,
-            group_by="contexts"
+            # group_by="contexts"
+            group_by="gen_kwargs"
             if self.AUTO_MODEL_CLASS == transformers.AutoModelForCausalLM
             and self.logits_cache
             else None,
@@ -989,17 +1102,24 @@ class HFLM(TemplateLM):
             inps = []
             cont_toks_list = []
             inplens = []
+            images = []
 
             conts = []
             encoder_attns = []
 
             padding_len_inp = None
             padding_len_cont = None
+            padding_len_img = None
             # because vectorizing is annoying, we first convert each (context, continuation) pair to padded
             # tensors, then we pack them together into a batch, call the model, and then pick it all apart
             # again because vectorizing is annoying
 
-            for _, context_enc, continuation_enc in chunk:
+            for item in chunk:
+                if len(item) == 3:
+                    _, context_enc, continuation_enc = item
+                    image_id = None
+                elif len(item) == 5:
+                    _, context_enc, continuation_enc, image_id, image_key = item
                 # sanity check
                 assert len(context_enc) > 0
                 assert len(continuation_enc) > 0
@@ -1020,7 +1140,8 @@ class HFLM(TemplateLM):
                         device=self.device,
                     )
                     (inplen,) = inp.shape
-                elif self.AUTO_MODEL_CLASS == transformers.AutoModelForSeq2SeqLM:
+                elif self.AUTO_MODEL_CLASS in (transformers.AutoModelForSeq2SeqLM,
+                                               transformers.AutoModelForMaskedLM):
                     inp = torch.tensor(
                         (context_enc)[-self.max_length :],
                         dtype=torch.long,
@@ -1054,17 +1175,29 @@ class HFLM(TemplateLM):
                     else inplen
                 )
 
+                if image_id is not None and self.image_processor is not None:
+                    image_embs = self.image_processor(images=self.image_src[image_id][image_key].convert(mode="RGB"),
+                                                      return_tensors="pt")["pixel_values"].to(self.device)
+                    images.append(image_embs)
+
                 inps.append(inp)  # [1, inp_length]
                 cont_toks_list.append(continuation_enc)
                 inplens.append(inplen)
+                
 
             # create encoder attn mask and batched conts, if seq2seq
             call_kwargs = {}
             if self.AUTO_MODEL_CLASS == transformers.AutoModelForCausalLM:
                 batched_inps = pad_and_concat(
                     padding_len_inp, inps, padding_side="right"
-                )  # [batch, padding_len_inp]
-            elif self.AUTO_MODEL_CLASS == transformers.AutoModelForSeq2SeqLM:
+                )  # [batch, padding_len_inp]xw
+            if image_id and self.image_processor is not None:
+                batched_images = torch.cat(images, dim=0)
+                call_kwargs = {
+                    "image_embeds": batched_images
+                }
+            elif self.AUTO_MODEL_CLASS in (transformers.AutoModelForSeq2SeqLM,
+                                           transformers.AutoModelForMaskedLM):
                 # TODO: left-pad encoder inps and mask?
                 batched_inps = pad_and_concat(
                     padding_len_inp, inps
@@ -1084,9 +1217,14 @@ class HFLM(TemplateLM):
                 self._model_call(batched_inps, **call_kwargs), dim=-1
             )  # [batch, padding_length (inp or cont), vocab]
 
-            for (request_str, ctx_tokens, _), logits, inplen, cont_toks in zip(
+            for item, logits, inplen, cont_toks in zip(
                 chunk, multi_logits, inplens, cont_toks_list
             ):
+                if len(item) == 3:
+                    request_str, ctx_tokens, _ = item
+                    image_id = None
+                elif len(item) == 5:
+                    request_str, ctx_tokens, _, image_id, image_key = item
                 # Slice to original seq length
                 contlen = len(cont_toks)
                 # take only logits in the continuation
@@ -1227,7 +1365,8 @@ class HFLM(TemplateLM):
             if self.AUTO_MODEL_CLASS == transformers.AutoModelForCausalLM:
                 # max len for inputs = max length, minus room to generate the max new tokens
                 max_ctx_len = self.max_length - max_gen_toks
-            elif self.AUTO_MODEL_CLASS == transformers.AutoModelForSeq2SeqLM:
+            elif self.AUTO_MODEL_CLASS in (transformers.AutoModelForSeq2SeqLM,
+                                           transformers.AutoModelForMaskedLM):
                 # max len for inputs = encoder's whole max_length
                 max_ctx_len = self.max_length
 
@@ -1277,43 +1416,184 @@ class HFLM(TemplateLM):
 
         return res
 
-    def get_model_info(self) -> dict:
+
+@register_model("hf-mlm")
+class AutoMaskedLM(HFLM):
+    """Masked language modeling.
+    You can find a set of supported models in the following documentation:
+    https://huggingface.co/docs/transformers/main/model_doc/auto#transformers.AutoModelForMaskedLM
+    
+    Much of the code in this class is adapted from minicons, by Kanishka Misra:
+    https://github.com/kanishkamisra/minicons
+    which is itself adapted from the code of Salazar et al. (2020):
+    https://github.com/awslabs/mlm-scoring
+    """
+
+    @property
+    def max_length(self) -> int:
+        """Return the maximum sequence length of the model.
+        TODO: Currently only works for relative position encoded Seq2Seq models.
         """
-        Method to get Hugging Face model information for experiment reproducibility.
+        if self._max_length is not None:
+            return self._max_length
+        return self._DEFAULT_MAX_LENGTH
+
+    def _model_call(
+        self, inps, attn_mask=None, labels=None):
+            return self.model(inps, labels=labels)
+
+    def _model_generate(self, inputs, max_tokens, stop=None):
+        raise NotImplementedError("Masked LMs are not well-suited to generating sequences.")
+
+    def encode(self, text, manual_special=True, return_tensors="pt"):
         """
+        Encode a batch of sentences using the model's tokenizer.
+        Equivalent of calling `model.tokenizer(input)`
+        :param ``Union[str, List[str]]`` text: Input batch/sentence to
+            be encoded.
+        :param manual_special: Specification of whether special tokens
+            will be manually encoded.
+        :type manual_special: bool
+        :param return_tensors: returned tensor format. Default `'pt'`
+        :type manual_special: str
+        :return: Encoded batch 
+        :rtype: ``Dict``
+        """
+        sentences = [text] if isinstance(text, str) else text
 
-        def get_model_num_params(model) -> int:
-            if hasattr(model, "num_parameters"):
-                return model.num_parameters()
-            if hasattr(model, "parameters"):
-                return sum(p.numel() for p in model.parameters())
-            else:
-                return -1
+        if manual_special:
+            # manually add special tokens
+            sentences = self.add_special_tokens(sentences)
+            if return_tensors:
+                tokens = self.tokenizer.batch_encode_plus(sentences, add_special_tokens = False, padding = 'longest', return_attention_mask = True, return_tensors = return_tensors)
+        else:
+            # mostly for masked LMs
+            tokens = self.tokenizer.batch_encode_plus(sentences, padding = 'longest', return_attention_mask = True)
 
-        def get_model_dtype(model) -> str:
-            if hasattr(model, "dtype"):
-                return model.dtype
-            else:
-                return ""
+        return tokens
+    
+    def _prepare_text(self, text):
+        sentences = [text] if isinstance(text, str) else list(text) if isinstance(text, tuple) else text
+        encoded = self.encode(sentences, manual_special = False)
 
-        def get_model_sha(pretrained: str, revision: str) -> str:
-            try:
-                model_info = HfApi().model_info(repo_id=pretrained, revision=revision)
-                return model_info.sha
-            except Exception as e:
-                eval_logger.warn(
-                    f"Failed to get model SHA for {pretrained} at revision {revision}. Error: {e}"
-                )
-                return ""
+        token_idx = encoded['input_ids']
+        attention_masks = encoded['attention_mask']
 
-        model_info = {
-            "model_num_parameters": get_model_num_params(self._model),
-            "model_dtype": get_model_dtype(self._model),
-            "model_revision": self.revision,
-            "model_sha": get_model_sha(self.pretrained, self.revision),
-        }
-        if self.peft:
-            model_info["peft_sha"] = get_model_sha(self.peft, self.revision)
-        if self.delta:
-            model_info["delta_sha"] = get_model_sha(self.delta, self.revision)
-        return model_info
+        masked_tensors = [] # token ids, attention masks, lengths
+
+        for token_ids, attention_mask in zip(token_idx, attention_masks):
+            token_ids = torch.tensor(token_ids)
+            # final_lengths = len(token_ids) - 2
+            attention_mask = torch.tensor(attention_mask)
+            
+            token_ids_masked_list = []
+            attention_masked_list = []
+
+            effective_token_ids = [token for token in token_ids if token != self.tokenizer.pad_token_id and \
+                                   token != self.tokenizer.cls_token_id and token != self.tokenizer.sep_token_id]
+            effective_length = len(effective_token_ids)
+
+            mask_indices = []
+            mask_indices = [[mask_pos] for mask_pos in range(effective_length+2)]
+
+            # We don't mask the [CLS], [SEP] for now for PLL
+            mask_indices = mask_indices[1:-1]
+
+            mask_token_id = self.tokenizer.mask_token_id
+            for mask_set in mask_indices:
+                token_ids_masked = token_ids.clone()
+                token_ids_masked[mask_set] = mask_token_id
+                attention_masked = attention_mask.clone()
+                
+                attention_masked_list.append(attention_masked)
+                token_ids_masked_list.append(token_ids_masked)
+            masked_tensors.append((torch.stack(token_ids_masked_list), torch.stack(attention_masked_list), effective_token_ids, len(mask_indices), 1))
+        
+        return masked_tensors
+
+    def loglikelihood(self, requests, disable_tqdm=False):
+        """
+        Returns *pseudo*-loglikelihoods, as described in Salazar et al. (2020).
+        """
+        assert getattr(self.config, "model_type") in MODEL_FOR_MASKED_LM_MAPPING_NAMES, \
+            "Used `--model hf-mlm`, but model doesn't have an AutoModelForMaskedLM implementation!"
+
+        def _collate(req: Tuple[str, dict]):
+            """Defines the key for the sorted method"""
+            # the negative sign on len(toks) sorts descending - this has a few advantages:
+            # - time estimates will always be over not underestimates, which is more useful for planning
+            # - to know the size of a batch when going through the list, you know the first one is always the batch
+            #   padded context length. this is useful to simplify the batching logic and more importantly to make
+            #   automatic adaptive batches much much easier to implement
+            # - any OOMs will happen right away rather than near the end
+            toks = self.tok_encode(req[0])
+            return -len(toks), req[0]
+
+        scores = []
+                
+        re_ords = Collator(
+            [reg.args for reg in requests],
+            sort_fn=_collate,
+            group_by="gen_kwargs",
+            group_fn=lambda x: x[1],
+        )
+        adaptive_batch_size = None
+        if self.batch_size == "auto":
+            # using rolling window with maximum context
+            print("Passed argument batch_size = auto. Detecting largest batch size")
+            batch_size = self._detect_batch_size()
+            print(f"Determined Largest batch size: {batch_size}")
+            adaptive_batch_size = batch_size
+        batch_size = (
+            self.batch_size
+            if self.batch_size != "auto"
+            else adaptive_batch_size
+            if adaptive_batch_size is not None
+            else 0
+        )
+        batch_fn = (
+            self._batch_scheduler
+            if self.batch_size == "auto" and not adaptive_batch_size
+            else None
+        )
+        chunks = re_ords.get_batched(n=batch_size, batch_fn=batch_fn)
+        pbar = tqdm(
+            total=len(requests),
+            disable=(disable_tqdm or (self.rank != 0)),
+            desc="Running loglikelihood requests",
+        )
+
+        for chunk in chunks:
+            # chunk_items = zip(*chunk)
+            context, continuation = zip(*chunk)
+            context = [
+                f"{self.tokenizer.eos_token}" if len(text) == 0 else text for text in context
+            ]
+
+            tokenized = self._prepare_text(continuation)
+
+            token_ids, attention_masks, effective_token_ids, lengths, offsets = list(zip(*tokenized))
+            token_ids = torch.cat(token_ids)
+            attention_masks = torch.cat(attention_masks)
+            token_ids = token_ids.to(self.device)
+            attention_masks = attention_masks.to(self.device)
+            effective_token_ids = torch.cat([torch.tensor(x) for x in effective_token_ids])
+            
+            indices = list(chain.from_iterable([list(range(o,o+n)) for n, o in zip(lengths, offsets)]))
+
+            with torch.no_grad():
+                output = self.model(token_ids, attention_mask = attention_masks)
+                logits = output.logits.detach()[torch.arange(sum(lengths)), indices]
+
+            logprob_distribution = logits - logits.logsumexp(1).unsqueeze(1)
+
+            logprob_distribution = logprob_distribution/torch.tensor(2).log()
+
+            batch_scores = logprob_distribution[torch.arange(sum(lengths)), effective_token_ids].type(torch.DoubleTensor).split(lengths)
+            batch_scores = [(float(s.sum()), False) for s in batch_scores]
+            
+            scores.extend(batch_scores)
+            pbar.update(len(chunk))
+        pbar.close()
+
+        return scores

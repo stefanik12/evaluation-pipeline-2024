@@ -435,7 +435,7 @@ class Collator:
         req_str: Tuple[str, str] = None,
         cxt_toks: List[int] = None,
         cont_toks: List[int] = None,
-        logits: torch.Tensor = None,
+        logits: torch.Tensor = None
     ) -> Iterator[Tuple[Tuple[str, str], List[int], torch.Tensor]]:
         """
         Retrieves cached single-token continuations and their associated arguments, updating indices as necessary.
@@ -487,8 +487,9 @@ class Collator:
                     *[(x[0], x[1][0], x[-1][-1]) for x in cache_hit]
                 )
                 self._reorder_indices.extend(indices)
-                for c_key, cont_tok, logit in zip(req_str, cont_toks, multilogits):
-                    yield c_key, cont_tok, logit
+                for i, (c_key, cont_tok, logit) in enumerate(zip(req_str, cont_toks, multilogits)):
+                    # yield c_key, cont_tok, logit
+                    yield req_str, cont_toks, multilogits[i]
         else:
             yield req_str, cont_toks, logits
 
