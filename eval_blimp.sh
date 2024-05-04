@@ -8,5 +8,5 @@ python -m lm_eval --model hf \
     --tasks blimp_filtered,blimp_supplement \
     --device cuda:0 \
     --batch_size 128 \
-	--output_path results/blimp/${MODEL_BASENAME}/blimp_results.json \
-	--trust_remote_code
+    --output_path results/blimp/${MODEL_BASENAME}/blimp_results.json \
+    --trust_remote_code

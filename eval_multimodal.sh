@@ -3,8 +3,7 @@
 MODEL_PATH=$1
 MODEL_BASENAME=$(basename $MODEL_PATH)
 
-# for task in {"winoground_filtered","vqa_filtered"}; do
-for task in {"vqa_filtered",}; do
+for task in {"winoground_filtered","vqa_filtered"}; do
 	if [ $task = "winoground_filtered" ]; then
 		image_src="facebook/winoground"
 	elif [ $task = "vqa_filtered" ]; then
