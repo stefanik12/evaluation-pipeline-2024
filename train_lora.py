@@ -104,8 +104,8 @@ if __name__ == "__main__":
     tokenizer_path = args.model_path if args.tokenizer_path is None else args.tokenizer_path
     tokenizer = load_tokenizer(tokenizer_path, args.padding_side)
     
-    data_files = {"train": f"data/glue_filtered/{args.task}.train.jsonl",
-                  "validation": f"data/glue_filtered/{args.task}.valid.jsonl"}
+    data_files = {"train": f"evaluation_data/glue_filtered/{args.task}.train.jsonl",
+                  "validation": f"evaluation_data/glue_filtered/{args.task}.valid.jsonl"}
     dataset = load_dataset("json", data_files=data_files)
     if task == "multirc":
         dataset = dataset.map(lambda example: {'question_and_answer': f"{example['question']} {example['answer']}"},
@@ -142,7 +142,7 @@ if __name__ == "__main__":
     num_labels = len(np.unique(tokenized_dataset["train"]["labels"]))
 
     if args.task == "mnli":
-        dataset_mm = load_dataset("json", data_files={"validation": "data/glue_filtered/mnli-mm.valid.jsonl"})
+        dataset_mm = load_dataset("json", data_files={"validation": "evaluation_data/glue_filtered/mnli-mm.valid.jsonl"})
         tokenized_dataset_mm = dataset_mm.map(tokenize_fn, batched=True, remove_columns=columns_to_remove,
                                               fn_kwargs={"tokenizer": tokenizer,
                                                         "input_columns": input_columns,
