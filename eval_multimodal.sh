@@ -15,6 +15,6 @@ for task in {"winoground_filtered","vqa_filtered"}; do
 		--tasks $task \
 		--device cuda:0 \
 		--batch_size 64 \
-		--output_path results/${MODEL_BASENAME}/${task}_results.json \
+		--output_path results/${task}/${MODEL_BASENAME}/${task}_results.json \
 		--image_src $image_src
 done

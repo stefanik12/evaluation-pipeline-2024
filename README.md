@@ -4,7 +4,7 @@
 
 ## Overview
 
-This code provides the backend for the BabyLM Challenge's evaluation pipeline. It is based on EleutherAI's `lm-evaluation-harness` (citation and details below). We provide support for zero-shot evaluations on BLiMP, as well as scripts for training low-rank adapters on models for GLUE tasks.
+This code provides the backend for the BabyLM Challenge's evaluation pipeline. It is a fork of EleutherAI's `lm-evaluation-harness` (citation and details below). We provide support for zero-shot evaluations on BLiMP, as well as scripts for training low-rank adapters on models for GLUE tasks.
 
 If you have questions about or suggestions for this code, please open an issue and consider [joining our Slack](https://join.slack.com/t/babylmchallenge/shared_invite/zt-2gqgqaumu-5ebxxADuT561aT_ooKbT1Q). Join the `#evaluation` channel, which is dedicated to support for use of this repository.
 
@@ -12,11 +12,11 @@ We also welcome pull requests!
 
 ## Install
 
-To install the `lm-eval` package from the github repository, run this code:
+To install the `lm-eval` package from the github repository, run:
 
 ```bash
-git clone https://github.com/EleutherAI/lm-evaluation-harness
-cd lm-evaluation-harness
+git clone https://github.com/babylm/evaluation-pipeline-2024
+cd evaluation-pipeline-2024
 pip install -e .
 ```
 
@@ -40,15 +40,26 @@ Use the following shell script to evaluate on BLiMP:
 ./eval_blimp.sh <path_to_model>
 ```
 
-This should work out-of-the-box if you are using a HuggingFace-based autoregressive or sequence-to-sequence model. If you are using a masked language model, change `--model hf` to `--model hf-mlm` in `eval_blimp.sh`. Use `--model mamba_ssm` for Mamba models, or `--model gguf`/`--model ggml` for Llama.cpp models. (Note that these both require additional dependencies; see Optional Extras below for installation instructions.) See the README of [the original lm-evaluation-harness repository](https://github.com/EleutherAI/lm-evaluation-harness) for a complete list of supported models.
+This should work out-of-the-box if you are using a HuggingFace-based autoregressive model. If you are using a masked language model, change `--model hf` to `--model hf-mlm`. If you are using a custom model not included in HuggingFace's config list, you may also need to change `--pretrained $MODEL_NAME` to `--pretrained $MODEL_NAME,backend="mlm"` if you are using a masked LM (or `backend="causal"` if you are using an autoregressive model).
 
-#### Adapter training and evaluation
-This year, we are providing support for training low-rank adapters instead of full model fine-tuning. This change was motivated by (1) greater compute-efficiency; (2) lower disk space requirements; and (3) greater modularity.
+If you are instead using Mamba or another non-HF model, change the `--model` argument in the script. Use `--model mamba_ssm` for Mamba models, or `--model gguf`/`--model ggml` for Llama.cpp models. (Note that these both require additional dependencies; see Optional Extras below for installation instructions.) See the README of [the original lm-evaluation-harness repository](https://github.com/EleutherAI/lm-evaluation-harness) for a complete list of supported models.
 
-To train low-rank adapters on all (Super)GLUE evaluation tasks, use the following command:
-```
-./train_lora.sh <path_to_model>
-```
+#### Fine-tuning or low-rank adapter training
+
+Like last year, we provide a script to support fine-tuning on all tasks. Running `finetune_model.sh <model_name>`
+will fine-tune your model on all (Super)GLUE tasks. You can also optionally specify hyperparameters like batch size,
+learning rate, among others.
+
+Here are the hyperparameters used for fine-tuning for all tasks. Feel free to modify these, or to set task-specific hyperparameters:
+| Hyperparameter | Value |
+| -------------- | ----- |
+| Initial learning rate | 5e-5 |
+| Batch size | 64 |
+| Maximum epochs | 10 |
+| Evaluate every (epochs) | 1 |
+| Patience | 3 |
+
+This year, we are also providing support for training low-rank adapters instead of full model fine-tuning. This change was motivated by (1) greater compute-efficiency; (2) lower disk space requirements; and (3) modularity. To train low-rank adapters on all (Super)GLUE evaluation tasks, run `train_lora.sh`.
 
 By default, this uses the same hyperparameters for all tasks. Here are the defaults:
 | Hyperparameter | Value |
@@ -66,6 +77,7 @@ The checkpoint with the best validation performance is the one that is evaluated
 Feel free to modify the hyperparameters, and even to modify the type of adapter or fine-tuning method used. (We have not directly integrated support for QLoRA or ReFT, but we welcome pull requests that add these features!)
 
 ### Multimodal evaluation
+
 If you are participating in the multimodal track, use these instructions.
 
 First, run your models on the text-only evaluations, including BLiMP, the BLiMP supplement, and (Super)GLUE. As long as your model is compatible with the AutoModelForCausalLM and AutoModelForSequenceClassification classes, you can use the same instructions as above to evaluate on the text-only tasks.
@@ -86,7 +98,7 @@ You will upload your models and your models' predictions on the evaluation tasks
 ----
 ----
 
-### Additional Features (from EleutherAI's README)
+### Additional Features (copied from EleutherAI README)
 Batch size selection can be automated by setting the  ```--batch_size``` flag to ```auto```. This will perform automatic detection of the largest batch size that will fit on your device.
 
 The full list of supported arguments are provided [here](./docs/interface.md), and on the terminal by calling `lm_eval -h`. Alternatively, you can use `lm-eval` instead of `lm_eval`.

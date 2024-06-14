@@ -176,6 +176,8 @@ class HFLM(TemplateLM):
             assert isinstance(pretrained, str)
             assert isinstance(batch_size, (int, str))
 
+            self.model_name = pretrained
+
             gpus = torch.cuda.device_count()
             accelerator_kwargs = InitProcessGroupKwargs(timeout=timedelta(weeks=52))
             accelerator = Accelerator(kwargs_handlers=[accelerator_kwargs])
@@ -855,7 +857,7 @@ class HFLM(TemplateLM):
         self.tokenizer.padding_side = padding_side
 
         add_special_tokens = {}
-        if self.AUTO_MODEL_CLASS ==transformers.AutoModelForCausalLM:
+        if self.AUTO_MODEL_CLASS == transformers.AutoModelForCausalLM:
             add_special_tokens = {"add_special_tokens": False or self.add_bos_token}
 
         encoding = self.tokenizer(
@@ -1098,6 +1100,7 @@ class HFLM(TemplateLM):
             disable=(disable_tqdm or (self.rank != 0)),
             desc="Running loglikelihood requests",
         )
+
         for chunk in chunks:
             inps = []
             cont_toks_list = []
@@ -1176,6 +1179,7 @@ class HFLM(TemplateLM):
                 )
 
                 if image_id is not None and self.image_processor is not None:
+
                     image_embs = self.image_processor(images=self.image_src[image_id][image_key].convert(mode="RGB"),
                                                       return_tensors="pt")["pixel_values"].to(self.device)
                     images.append(image_embs)
@@ -1184,7 +1188,7 @@ class HFLM(TemplateLM):
                 cont_toks_list.append(continuation_enc)
                 inplens.append(inplen)
                 
-
+            
             # create encoder attn mask and batched conts, if seq2seq
             call_kwargs = {}
             if self.AUTO_MODEL_CLASS == transformers.AutoModelForCausalLM:
@@ -1423,7 +1427,7 @@ class AutoMaskedLM(HFLM):
     You can find a set of supported models in the following documentation:
     https://huggingface.co/docs/transformers/main/model_doc/auto#transformers.AutoModelForMaskedLM
     
-    Much of the code in this class is adapted from minicons, by Kanishka Misra:
+    Much of the code in this class is adapted from or uses minicons, by Kanishka Misra:
     https://github.com/kanishkamisra/minicons
     which is itself adapted from the code of Salazar et al. (2020):
     https://github.com/awslabs/mlm-scoring
@@ -1500,6 +1504,17 @@ class AutoMaskedLM(HFLM):
             mask_indices = mask_indices[1:-1]
 
             mask_token_id = self.tokenizer.mask_token_id
+            if mask_token_id is None:
+                self.tokenizer.mask_token_id = self.model.config.mask_token_id
+                self.tokenizer.pad_token_id = self.model.config.pad_token_id
+                self.tokenizer.cls_token_id = self.model.config.cls_token_id
+
+                # mask_token_id = self.model.config.mask_token_id
+                # mask_token_id = self.tokenizer.encode("[MASK]")
+                # assert len(mask_token_id) == 1
+                # mask_token_id = mask_token_id[0]
+                # self.tokenizer.add_special_token
+
             for mask_set in mask_indices:
                 token_ids_masked = token_ids.clone()
                 token_ids_masked[mask_set] = mask_token_id
@@ -1515,8 +1530,11 @@ class AutoMaskedLM(HFLM):
         """
         Returns *pseudo*-loglikelihoods, as described in Salazar et al. (2020).
         """
-        assert getattr(self.config, "model_type") in MODEL_FOR_MASKED_LM_MAPPING_NAMES, \
-            "Used `--model hf-mlm`, but model doesn't have an AutoModelForMaskedLM implementation!"
+        
+        from minicons.scorer import MaskedLMScorer
+        
+        # assert getattr(self.config, "model_type") in MODEL_FOR_MASKED_LM_MAPPING_NAMES, \
+        #     "Used `--model hf-mlm`, but model doesn't have an AutoModelForMaskedLM implementation!"
 
         def _collate(req: Tuple[str, dict]):
             """Defines the key for the sorted method"""
@@ -1563,6 +1581,12 @@ class AutoMaskedLM(HFLM):
             desc="Running loglikelihood requests",
         )
 
+        if self.tokenizer.mask_token_id is None:
+            self.tokenizer.mask_token_id = self.model.config.mask_token_id
+            self.tokenizer_pad_token_id = self.model.config.pad_token_id
+
+        scorer = MaskedLMScorer(self.model, self.device, tokenizer=self.tokenizer)
+
         for chunk in chunks:
             # chunk_items = zip(*chunk)
             context, continuation = zip(*chunk)
@@ -1570,28 +1594,8 @@ class AutoMaskedLM(HFLM):
                 f"{self.tokenizer.eos_token}" if len(text) == 0 else text for text in context
             ]
 
-            tokenized = self._prepare_text(continuation)
-
-            token_ids, attention_masks, effective_token_ids, lengths, offsets = list(zip(*tokenized))
-            token_ids = torch.cat(token_ids)
-            attention_masks = torch.cat(attention_masks)
-            token_ids = token_ids.to(self.device)
-            attention_masks = attention_masks.to(self.device)
-            effective_token_ids = torch.cat([torch.tensor(x) for x in effective_token_ids])
-            
-            indices = list(chain.from_iterable([list(range(o,o+n)) for n, o in zip(lengths, offsets)]))
-
-            with torch.no_grad():
-                output = self.model(token_ids, attention_mask = attention_masks)
-                logits = output.logits.detach()[torch.arange(sum(lengths)), indices]
-
-            logprob_distribution = logits - logits.logsumexp(1).unsqueeze(1)
-
-            logprob_distribution = logprob_distribution/torch.tensor(2).log()
-
-            batch_scores = logprob_distribution[torch.arange(sum(lengths)), effective_token_ids].type(torch.DoubleTensor).split(lengths)
-            batch_scores = [(float(s.sum()), False) for s in batch_scores]
-            
+            chunk_logprobs = scorer.conditional_score(context, continuation)
+            batch_scores = [(p, False) for p in chunk_logprobs]
             scores.extend(batch_scores)
             pbar.update(len(chunk))
         pbar.close()
