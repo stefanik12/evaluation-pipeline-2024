@@ -40,7 +40,7 @@ Use the following shell script to evaluate on BLiMP:
 ./eval_blimp.sh <path_to_model>
 ```
 
-This should work out-of-the-box if you are using a HuggingFace-based autoregressive model. If you are using a masked language model, change `--model hf` to `--model hf-mlm`. If you are using a custom model not included in HuggingFace's config list, you may also need to change `--pretrained $MODEL_NAME` to `--pretrained $MODEL_NAME,backend="mlm"` if you are using a masked LM (or `backend="causal"` if you are using an autoregressive model).
+This should work out-of-the-box if you are using a HuggingFace-based autoregressive model. If you are using a masked language model, change `--model hf` to `--model hf-mlm`. If you are using a custom model not included in HuggingFace's config list, you may also need to change `--model_args pretrained=$MODEL_NAME` to `--model_args pretrained=$MODEL_NAME,backend="mlm"` if you are using a masked LM (or `backend="causal"` if you are using an autoregressive model).
 
 If you are instead using Mamba or another non-HF model, change the `--model` argument in the script. Use `--model mamba_ssm` for Mamba models, or `--model gguf`/`--model ggml` for Llama.cpp models. (Note that these both require additional dependencies; see Optional Extras below for installation instructions.) See the README of [the original lm-evaluation-harness repository](https://github.com/EleutherAI/lm-evaluation-harness) for a complete list of supported models.
 
