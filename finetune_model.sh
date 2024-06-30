@@ -18,13 +18,13 @@ for task in {boolq,cola,mnli,mnli-mm,mrpc,multirc,qnli,qqp,rte,sst2,wsc}; do
 		TRAIN_NAME=$task
 		VALID_NAME=$task
 		DO_TRAIN=True
-		MODEL_PATH_FULL="results/finetune/$model_basename/$TRAIN_NAME/"
+		MODEL_PATH_FULL=$MODEL_PATH
 	fi
 
 	mkdir -p results/finetune/$model_basename/$task/
 
 	python finetune_classification.py \
-	  --model_name_or_path $MODEL_PATH \
+	  --model_name_or_path $MODEL_PATH_FULL \
 	  --output_dir results/finetune/$model_basename/$task/ \
 	  --train_file evaluation_data/glue_filtered/$TRAIN_NAME.train.jsonl \
 	  --validation_file evaluation_data/glue_filtered/$VALID_NAME.valid.jsonl \
