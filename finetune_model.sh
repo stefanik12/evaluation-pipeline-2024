@@ -31,7 +31,6 @@ for task in {boolq,cola,mnli,mnli-mm,mrpc,multirc,qnli,qqp,rte,sst2,wsc}; do
 	  --do_train $DO_TRAIN \
 	  --do_eval \
 	  --do_predict \
-	  --use_fast_tokenizer False \
 	  --max_seq_length 128 \
 	  --per_device_train_batch_size $BSZ \
 	  --learning_rate $LR \
