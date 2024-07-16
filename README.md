@@ -88,9 +88,33 @@ In addition, use the following command to evaluate on Winoground (where we use a
 ```
 
 ## Baselines
-We will upload our baselines to Huggingface. We will also put our baselines' scores on the evaluation tasks here. Stay tuned!
+The baseline models are available from the BabyLM huggingface page here: https://huggingface.co/babylm . All models for this year's challenge have `-2024` appended to them.
 
-The text-only baselines will be based on BabyLlama and LTG-BERT (the best autoregressive and masked language models from last year's challenge, respectively). The multimodal baselines will be based on GIT and Flamingo.
+For the strict and strict-small tracks, we release [BabyLlama](https://aclanthology.org/2023.conll-babylm.24/) and [LTG-BERT](https://aclanthology.org/2023.conll-babylm.20/) baselines. These architectures were chosen because they were the winning methods from last year's challenge. Models containing `-100m` are for the strict track; those containing `-10m` are for strict-small.
+
+For the multimodal tracks, we release [Flamingo](https://proceedings.neurips.cc/paper_files/paper/2022/file/960a172bc7fbf0177ccccbb411a7d800-Paper-Conference.pdf) and [GIT](https://openreview.net/pdf?id=b4tMhpN0JC) baselines.
+
+Here are scores for each model on each evaluation task. Each task score is an unweighted mean of each subtask score within that task. We also show macroaverages, which are simply means of each task score (i.e., means across a row of the table). NOTE: for GLUE, we average *accuracies* for all tasks except QQP and MRPC (where we use F1 scores), and CoLA (where we use the Matthews correlation coefficient).
+
+**Strict-small Track (10M)**
+| | BLiMP | BLiMP Supplement | GLUE | *Macroaverage* |
+| BabyLlama | 69.7 | 77.3 | 63.3 | 70.1 |
+| LTG-BERT | 54.1 | 73.4 | 60.3 | 62.6 |
+
+The LTG-BERT scores here are lower than expected given that this was last year's winning system. We believe this is because of our choice of hyperparameters---specifically, the number of epochs: we trained all models for approximately 20 epochs. LTG-BERT benefits from training for many more epochs than other models can feasibly train for without overfitting, so perhaps it would perform better with longer training. This is somewhat supported by its results on the Strict track, where the same number of epochs corresponds to many more training steps:
+
+**Strict Track (100M)**
+| | BLiMP | BLiMP Supplement | GLUE | *Macroaverage* |
+| BabyLlama | 72.8 | 75.5 | 69.0 | 72.4 |
+| LTG-BERT | 69.3 | 79.7 | 68.4 | 72.5 |
+
+**Multimodal Track**
+| | BLiMP | BLiMP Supplement | GLUE | Winoground | VQA | *Macroaverage* |
+| Flamingo | 70.6 | 78.0 | 69.5 | 51.6 | 52.3 | 64.4 |
+| Flamingo (no vision) | - | - | - | 50.0 | 45.0 | |
+| GIT | 65.2 | 77.7 | 68.3 | 55.5 | 54.1 | 64.2 |
+| GIT (no vision) | - | - | - | 50.0 | 48.4 | |
+
 
 ## Submission Format
 You will upload your models and your models' predictions on the evaluation tasks. We will add instructions for doing so closer to the submission deadline.
