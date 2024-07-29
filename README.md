@@ -18,9 +18,10 @@ To install the `lm-eval` package from the github repository, run:
 git clone https://github.com/babylm/evaluation-pipeline-2024
 cd evaluation-pipeline-2024
 pip install -e .
+pip install minicons
 ```
 
-If you need a previous version of torch and/or CUDA, install it after running the above commands.
+If you need a previous version of torch and/or CUDA, install it after running the above commands. You may also need to upgrade the `accelerate` library after installing the above packages; if so, use `pip install --upgrade accelerate`.
 
 ## Data
 
