@@ -395,7 +395,7 @@ def evaluate(
         # put responses from model into a list of length K for each request.
         for x, req in zip(resps, cloned_reqs):
             req.resps.append(x)
-
+        
         if lm.world_size > 1:
             lm.accelerator.wait_for_everyone()
 
@@ -524,7 +524,8 @@ def evaluate(
                     # compute group's pooled metric and stderr
                     results[group][
                         metric
-                    ] = lm_eval.api.metrics.aggregate_subtask_metrics(metrics, sizes)
+                    ] = lm_eval.api.metrics.aggregate_subtask_metrics(metrics, sizes,
+                                                                      weight_by_size=False)
                     # TODO: calculate grouped metric using aggregation fn
                     if "N/A" in stderrs:
                         results[group][stderr] = "N/A"

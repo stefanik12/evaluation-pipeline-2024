@@ -101,8 +101,8 @@ Here are scores for each model on each evaluation task. Each task score is an un
 
 | Model | BLiMP | BLiMP Supplement | GLUE | *Macroaverage* |
 | --- | --- | --- | --- | --- |
-| BabyLlama | 69.7 | 77.3 | 63.3 | 70.1 |
-| LTG-BERT | 54.1 | 73.4 | 60.3 | 62.6 |
+| BabyLlama | 69.8 | 59.5 | 63.3 | 64.2 |
+| LTG-BERT | 60.6 | 60.8 | 60.3 | 60.6 |
 
 The LTG-BERT scores here are lower than expected given that this was last year's winning system. We believe this is because of our choice of hyperparameters---specifically, the number of epochs: we trained all models for approximately 20 epochs. LTG-BERT benefits from training for many more epochs than other models can feasibly train for without overfitting, so perhaps it would perform better with longer training. This is somewhat supported by its results on the Strict track, where the same number of epochs corresponds to many more training steps:
 
@@ -110,20 +110,24 @@ The LTG-BERT scores here are lower than expected given that this was last year's
 
 | | BLiMP | BLiMP Supplement | GLUE | *Macroaverage* |
 | --- | --- | --- | --- | --- |
-| BabyLlama | 72.8 | 75.5 | 69.0 | 72.4 |
-| LTG-BERT | 69.3 | 79.7 | 68.4 | 72.5 |
+| BabyLlama | 73.1 | 60.6 | 69.0 | 67.6 |
+| LTG-BERT | 69.2 | 66.5 | 68.4 | 68.0 |
 
 **Multimodal Track**
 
 Here, we show the performance of the Flamingo and GIT baselines on all text-only *and* multimodal tasks. We also show how performance changes on the multimodal tasks when images are not provided to the model during evaluation (i.e., we use the same trained text-and-image model, but modify the evaluation setup to remove any visual information).
 
-| | BLiMP | BLiMP Supplement | GLUE | Winoground | VQA | *Macroaverage* |
-| --- | --- | --- | --- | --- | --- | --- |
-| Flamingo | 70.6 | 78.0 | 69.5 | 51.6 | 52.3 | 64.4 |
-| Flamingo (no vision) | - | - | - | 50.0 | 45.0 | |
-| GIT | 65.2 | 77.7 | 68.3 | 55.5 | 54.1 | 64.2 |
-| GIT (no vision) | - | - | - | 50.0 | 48.4 | |
+| BLiMP | BLiMP Supplement | GLUE | *Text Macroaverage* | 
+| --- | --- | --- | --- |
+| Flamingo | 70.9 | 65.0 | 69.5 | 68.5 |
+| GIT | 65.2 | 77.7 | 68.3 | 65.5 |
 
+| Winoground | VQA | *Vision Macroaverage* |
+| --- | --- | --- |
+| Flamingo | 51.6 | 52.3 | 52.0 |
+| Flamingo (no vision) | 50.0 | 45.0 | 47.5 |
+| GIT | 55.5 | 54.1 | 54.8 |
+| GIT (no vision) | 50.0 | 48.4 | 49.2 |
 
 ## Submission Format
 You will upload your models and your models' predictions on the evaluation tasks. We will add instructions for doing so closer to the submission deadline.
