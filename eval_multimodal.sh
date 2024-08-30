@@ -11,10 +11,14 @@ for task in {"winoground_filtered","vqa_filtered"}; do
 	fi
 
 	python -m lm_eval --model hf \
-		--model_args pretrained=$MODEL_PATH \
+		--model_args pretrained=$MODEL_PATH,backend="causal" \
 		--tasks $task \
 		--device cuda:0 \
 		--batch_size 64 \
 		--output_path results/${task}/${MODEL_BASENAME}/${task}_results.json \
-		--image_src $image_src
+		--image_src $image_src \
+		--log_samples
 done
+
+# Use `--model hf-mlm` and `--model_args pretrained=$MODEL_PATH,backend="mlm"` if using a custom masked LM.
+# Add `--trust_remote_code` if you need to load custom config/model files.

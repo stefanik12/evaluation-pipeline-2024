@@ -685,19 +685,19 @@ def main():
         # Removing the `label` columns because it contains -1 and Trainer won't like that.
         predict_dataset = predict_dataset.remove_columns("label")
         predictions = trainer.predict(predict_dataset, metric_key_prefix="predict").predictions
-        predictions = np.squeeze(predictions) if is_regression else np.argmax(predictions, axis=1)
+        predictions = np.squeeze(predictions) if is_regression else np.argmax(predictions[0], axis=1)
 
-        output_predict_file = os.path.join(training_args.output_dir, f"predict_results.txt")
-        if trainer.is_world_process_zero():
-            with open(output_predict_file, "w") as writer:
-                logger.info(f"***** Predict results *****")
-                writer.write("index\tprediction\n")
-                for index, item in enumerate(predictions):
-                    if is_regression:
-                        writer.write(f"{index}\t{item:3.3f}\n")
-                    else:
-                        item = label_list[item]
-                        writer.write(f"{index}\t{item}\n")
+        output_predict_file = os.path.join(training_args.output_dir, f"predictions.txt")
+        # if trainer.is_world_process_zero():
+        with open(output_predict_file, "w") as writer:
+            logger.info(f"***** Predict results *****")
+            writer.write("index\tprediction\n")
+            for index, item in enumerate(predictions):
+                if is_regression:
+                    writer.write(f"{index}\t{item:3.3f}\n")
+                else:
+                    item = label_list[item]
+                    writer.write(f"{index}\t{item}\n")
 
     kwargs = {"finetuned_from": model_args.model_name_or_path, "tasks": "text-classification"}
     if data_args.task_name is not None:

@@ -19,18 +19,26 @@ git clone https://github.com/babylm/evaluation-pipeline-2024
 cd evaluation-pipeline-2024
 pip install -e .
 pip install minicons
+pip install --upgrade accelerate
 ```
 
-If you need a previous version of torch and/or CUDA, install it after running the above commands. You may also need to upgrade the `accelerate` library after installing the above packages; if so, use `pip install --upgrade accelerate`.
+If you need a previous version of torch and/or CUDA, install it after running the above commands.
 
 ## Data
+**The hidden eval tracks have been released! See instructions here for downloading EWoK and DevBench. See instructions under Evaluation for running EWoK and DevBench evaluations.**
 
 Download the `evaluation_data` folder in [this OSF directory](https://osf.io/ad7qg/). Place it in the root directory of this repository.
 
-Due to large file sizes, we do not provide images in the OSF directory. Instead, we link to HuggingFace datasets, one of which requires approval (which is immediate). Go to [this URL](https://huggingface.co/datasets/facebook/winoground), log in to your HuggingFace account, and request approval. Then, in your terminal, log in to your account using `huggingface-cli login`, and enter your login token.
+Due to large file sizes and license restrictions, we do not provide images in the OSF directory. Instead, we link to HuggingFace datasets, two of which require approval (which is immediate). Go to these URLs:
+- [Winoground](https://huggingface.co/datasets/facebook/winoground)
+- [EWoK](https://huggingface.co/datasets/ewok-core/ewok-core-1.0)
+
+On both pages, make sure you're logged in to your HuggingFace account, and request approval. Then, in your terminal, log in to your account using `huggingface-cli login`, and enter your HuggingFace login token.
+
+For DevBench data, run `devbench/download_data.sh` from the root directory of this repository.
 
 ## Evaluation 
-This year, we provide different sets of evaluation tasks for different tracks. There will be surprise evaluation tasks released closer to the deadline; we will announce these on the Slack and here at least 2 weeks before the final submission deadline.
+This year, we provide different sets of evaluation tasks for different tracks.
 
 ### Text-only evaluation
 If you are participating in one of the text-only tracks (Strict or Strict-small), use these instructions.
@@ -41,7 +49,12 @@ Use the following shell script to evaluate on BLiMP:
 ./eval_blimp.sh <path_to_model>
 ```
 
-This should work out-of-the-box if you are using a HuggingFace-based autoregressive model. If you are using a masked language model, change `--model hf` to `--model hf-mlm`. If you are using a custom model not included in HuggingFace's standard architectures list, you'll also need to add the `backend` argument to `--model_args`. To do this, change `--model_args pretrained=$MODEL_NAME` to `--model_args pretrained=$MODEL_NAME,backend="mlm"` if you are using a masked LM, or `backend="causal"` if you are using an autoregressive model.
+And use the following shell script to evaluate on EWoK:
+```
+./eval_ewok.sh <path_to_model>
+```
+
+These should work out-of-the-box if you are using a HuggingFace-based autoregressive model. If you are using a masked language model, change `--model hf` to `--model hf-mlm`. If you are using a custom model not included in HuggingFace's standard architectures list, you'll also need to add the `backend` argument to `--model_args`. To do this, change `--model_args pretrained=$MODEL_NAME` to `--model_args pretrained=$MODEL_NAME,backend="mlm"` if you are using a masked LM, or `backend="causal"` if you are using an autoregressive model.
 
 If you are instead using Mamba or another non-HF model, change the `--model` argument in the script. Use `--model mamba_ssm` for Mamba models, or `--model gguf`/`--model ggml` for Llama.cpp models. (Note that these both require additional dependencies; see Optional Extras below for installation instructions.) See the README of [the original lm-evaluation-harness repository](https://github.com/EleutherAI/lm-evaluation-harness) for a complete list of supported models.
 
@@ -81,12 +94,18 @@ Feel free to modify the hyperparameters, and even to modify the type of adapter 
 
 If you are participating in the multimodal track, use these instructions.
 
-First, run your models on the text-only evaluations, including BLiMP, the BLiMP supplement, and (Super)GLUE. As long as your model is compatible with the AutoModelForCausalLM and AutoModelForSequenceClassification classes, you can use the same instructions as above to evaluate on the text-only tasks.
+First, run your models on the text-only evaluations, including BLiMP, the BLiMP supplement, EWoK, and (Super)GLUE. As long as your model is compatible with the AutoModelForCausalLM and AutoModelForSequenceClassification classes, you can use the same instructions as above to evaluate on the text-only tasks.
 
 In addition, use the following command to evaluate on Winoground (where we use an unpaired text score) and VQA (accuracy with 7 distractors).
 ```
 ./eval_multimodal.sh <path_to_model>
 ```
+
+Also use the following command to evaluate on DevBench:
+```
+./eval_devbench.sh <path_to_model> <model_type> (<image_model>)
+```
+Here, `model_type` refers to the architecture of the model. For example, for `babylm/git-2024`, the model type would be `git`. See the `eval_devbench.sh` script for more information.
 
 ## Baselines
 The baseline models are available from the BabyLM huggingface page here: https://huggingface.co/babylm . All models for this year's challenge have `-2024` appended to their names.
@@ -99,38 +118,57 @@ Here are scores for each model on each evaluation task. Each task score is an un
 
 **Strict-small Track (10M)**
 
-| Model | BLiMP | BLiMP Supplement | GLUE | *Macroaverage* |
-| --- | --- | --- | --- | --- |
-| BabyLlama | 69.8 | 59.5 | 63.3 | 64.2 |
-| LTG-BERT | 60.6 | 60.8 | 60.3 | 60.6 |
+| Model | BLiMP | BLiMP Supplement | EWoK | GLUE | *Macroaverage* |
+| --- | --- | --- | --- | --- | --- |
+| BabyLlama | 69.8 | 59.5 | 50.7 | 63.3 | 60.8 |
+| LTG-BERT | 60.6 | 60.8 | 48.9 | 60.3 | 57.7 |
 
 The LTG-BERT scores here are lower than expected given that this was last year's winning system. We believe this is because of our choice of hyperparameters---specifically, the number of epochs: we trained all models for approximately 20 epochs. LTG-BERT benefits from training for many more epochs than other models can feasibly train for without overfitting, so perhaps it would perform better with longer training. This is somewhat supported by its results on the Strict track, where the same number of epochs corresponds to many more training steps:
 
 **Strict Track (100M)**
 
-| | BLiMP | BLiMP Supplement | GLUE | *Macroaverage* |
-| --- | --- | --- | --- | --- |
-| BabyLlama | 73.1 | 60.6 | 69.0 | 67.6 |
-| LTG-BERT | 69.2 | 66.5 | 68.4 | 68.0 |
+| | BLiMP | BLiMP Supplement | EWoK | GLUE | *Macroaverage* |
+| --- | --- | --- | --- | --- | --- |
+| BabyLlama | 73.1 | 60.6 | 52.1 | 69.0 | 63.7 |
+| LTG-BERT | 69.2 | 66.5 | 51.9 | 68.4 | 64.0 |
 
 **Multimodal Track**
 
 Here, we show the performance of the Flamingo and GIT baselines on all text-only *and* multimodal tasks. We also show how performance changes on the multimodal tasks when images are not provided to the model during evaluation (i.e., we use the same trained text-and-image model, but modify the evaluation setup to remove any visual information).
 
-| BLiMP | BLiMP Supplement | GLUE | *Text Macroaverage* | 
-| --- | --- | --- | --- |
-| Flamingo | 70.9 | 65.0 | 69.5 | 68.5 |
-| GIT | 65.2 | 77.7 | 68.3 | 65.5 |
+| | BLiMP | BLiMP Supplement | EWoK | GLUE | *Text Macroaverage* | 
+| --- | --- | --- | --- | --- | --- |
+| Flamingo | 70.9 | 65.0 | 52.7 | 69.5 | 64.5 |
+| GIT | 65.2 | 77.7 | 52.4 | 68.3 | 62.2 |
 
-| Winoground | VQA | *Vision Macroaverage* |
-| --- | --- | --- |
-| Flamingo | 51.6 | 52.3 | 52.0 |
-| Flamingo (no vision) | 50.0 | 45.0 | 47.5 |
-| GIT | 55.5 | 54.1 | 54.8 |
-| GIT (no vision) | 50.0 | 48.4 | 49.2 |
+| | Winoground | VQA | DevBench | *Vision Macroaverage* |
+| --- | --- | --- | --- | --- |
+| Flamingo | 51.6 | 52.3 | 60.1 | 54.7 |
+| Flamingo (no vision) | 50.0 | 45.0 | - | 47.5(*) |
+| GIT | 55.5 | 54.1 | 50.5 | 53.4 |
+| GIT (no vision) | 50.0 | 48.4 | - | 49.2(*) |
+
+(*) Not directly comparable to other macroaverages, since DevBench scores without vision are not well-defined. These rows are more useful as comparison points for Winoground and VQA with and without visual signals.
 
 ## Submission Format
-You will upload your models and your models' predictions on the evaluation tasks. We will add instructions for doing so closer to the submission deadline.
+You will upload your models and your models' predictions on the evaluation tasks. You can upload these to OpenReview, or provide links to Google Drive uploads in the OpenReview submission form.
+
+To collect your results into the expected format, use `collect_results.py`. This will produce a Gzipped JSON file containing your model's predictions for all tasks. It also runs a simple verification to make sure you've included predictions for all examples for all tasks.
+
+Note that you don't have to use this script to collect your results if you've been using an alternate evaluation setup! Also note that the JSON doesn't necessarily need to be Gzipped. Thus, if you'd like to see the exact format you need to put your results into, you may unzip the sample JSONs provided here and inspect them.
+
+### Text-only tasks
+For the text-only track, the JSON should contain one entry per task. Each task entry contains separate entries for all subtasks. Each subtask contains a list of dictionaries, where each dictionary has only two fields: an example ID and a prediction value. For example, for GLUE's BoolQ subtask:
+```
+{"glue": {"boolq": {"predictions": [{"id": "boolq_0", "pred": 0}, {"id": "boolq_1", "pred": 1}, ...]}}}
+```
+
+For all other text tasks, the "pred" key takes a string value instead of integers. In the samples provided here, there are spaces at the beginning of the strings, but this will not be required to be scored correct.
+
+### Vision tasks
+For VQA and Winoground, the same prediction formatting is used as for the text-only tasks. All predictions should be strings.
+
+For DevBench, "predictions"'s value should be a matrix of floats. This matrix has an exact expected size (which the verification function in `collect_results.py` checks for).
 
 ----
 ----

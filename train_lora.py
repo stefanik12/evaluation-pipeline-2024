@@ -86,6 +86,7 @@ if __name__ == "__main__":
     parser.add_argument("--output_dir", type=str, default=None) # defaults to `results/lora/model_path/task_name/`
     parser.add_argument("--max_length", type=int, default=128)
     parser.add_argument("--eval_only", action="store_true")
+    parser.add_argument("--do_predict", action="store_true")
     args = parser.parse_args()
 
 
@@ -168,6 +169,7 @@ if __name__ == "__main__":
     else:
         eval_dataset = tokenized_dataset["validation"]
         metric_to_track = "loss"
+
     trainer = Trainer(
         model=lora_model,
         tokenizer=tokenizer,
@@ -186,7 +188,7 @@ if __name__ == "__main__":
             learning_rate=lr,
             optim="adamw_torch",
             metric_for_best_model=metric_to_track,
-            warmup_steps=(args.warmup_proportion * len(dataset["train"]) * num_epochs),
+            warmup_steps=int(args.warmup_proportion * len(dataset["train"]) * num_epochs),
             load_best_model_at_end=True,
         )
     )
@@ -197,3 +199,12 @@ if __name__ == "__main__":
     
     metrics = trainer.evaluate(eval_dataset=eval_dataset)
     trainer.save_metrics("eval", metrics)
+    if args.do_predict:
+        predictions, labels, metrics = trainer.predict(eval_dataset, metric_key_prefix="predict")
+        predictions = np.argmax(predictions, axis=1)
+        print(predictions)
+        output_predict_file = os.path.join(output_dir, "predictions.txt")
+        with open(output_predict_file, "w") as writer:
+            writer.write("index\tprediction\n")
+            for index, item in enumerate(predictions):
+                writer.write(f"{index}\t{item}\n")
