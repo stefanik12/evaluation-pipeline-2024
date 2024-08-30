@@ -4,6 +4,8 @@
 
 ## Overview
 
+**[30 August] The hidden evaluation tasks have been released!**
+
 This code provides the backend for the BabyLM Challenge's evaluation pipeline. It is a fork of EleutherAI's `lm-evaluation-harness` (citation and details below). We provide support for zero-shot evaluations on BLiMP, as well as scripts for training low-rank adapters on models for GLUE tasks.
 
 If you have questions about or suggestions for this code, please open an issue and consider [joining our Slack](https://join.slack.com/t/babylmchallenge/shared_invite/zt-2gqgqaumu-5ebxxADuT561aT_ooKbT1Q). Join the `#evaluation` channel, which is dedicated to support for use of this repository.
@@ -25,7 +27,7 @@ pip install --upgrade accelerate
 If you need a previous version of torch and/or CUDA, install it after running the above commands.
 
 ## Data
-**The hidden eval tracks have been released! See instructions here for downloading EWoK and DevBench. See instructions under Evaluation for running EWoK and DevBench evaluations.**
+**The hidden eval tasks have been released! See instructions here for downloading EWoK and DevBench. See instructions under Evaluation for running EWoK and DevBench evaluations.**
 
 Download the `evaluation_data` folder in [this OSF directory](https://osf.io/ad7qg/). Place it in the root directory of this repository.
 

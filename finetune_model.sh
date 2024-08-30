@@ -1,7 +1,7 @@
 #!/bin/bash
 
 MODEL_PATH=$1
-LR=${2:-5e-5}           # default: 5e-4
+LR=${2:-5e-5}           # default: 5e-5
 PATIENCE=${3:-3}       # default: 3
 BSZ=${4:-64}            # default: 64
 MAX_EPOCHS=${5:-10}     # default: 10
