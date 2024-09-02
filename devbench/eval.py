@@ -127,7 +127,6 @@ if __name__ == "__main__":
     if not os.path.exists(f"results/devbench/{model_name}"):
         os.makedirs(f"results/devbench/{model_name}")
     
-    """
     # Visual vocabulary
     vv_ds = data_handling.DevBenchDataset("evaluation_data/devbench/assets/lex-viz_vocab/")
     vv_dl = data_handling.make_dataloader(vv_ds)
@@ -143,7 +142,6 @@ if __name__ == "__main__":
     trog_file = f"evaluation_data/devbench/evals/gram-trog/{model_name}.npy"
     np.save(trog_file, trog_sims)
     trog_score = get_trog_scores(trog_file)
-    """
 
     # THINGS
     things_ds = data_handling.DevBenchDataset("evaluation_data/devbench/assets/sem-things/")
