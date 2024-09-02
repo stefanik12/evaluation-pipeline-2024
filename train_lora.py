@@ -188,7 +188,7 @@ if __name__ == "__main__":
             learning_rate=lr,
             optim="adamw_torch",
             metric_for_best_model=metric_to_track,
-            warmup_steps=int(args.warmup_proportion * len(dataset["train"]) * num_epochs),
+            warmup_ratio=args.warmup_proportion,
             load_best_model_at_end=True,
         )
     )
