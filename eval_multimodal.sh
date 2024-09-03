@@ -6,8 +6,10 @@ MODEL_BASENAME=$(basename $MODEL_PATH)
 for task in {"winoground_filtered","vqa_filtered"}; do
 	if [ $task = "winoground_filtered" ]; then
 		image_src="facebook/winoground"
+		image_src_split="test"
 	elif [ $task = "vqa_filtered" ]; then
 		image_src="HuggingFaceM4/VQAv2"
+		image_src_split="validation"
 	fi
 
 	python -m lm_eval --model hf \
@@ -17,6 +19,7 @@ for task in {"winoground_filtered","vqa_filtered"}; do
 		--batch_size 64 \
 		--output_path results/${task}/${MODEL_BASENAME}/${task}_results.json \
 		--image_src $image_src \
+		--image_src_split $image_src_split \
 		--log_samples
 done
 

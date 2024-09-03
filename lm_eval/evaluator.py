@@ -35,6 +35,7 @@ def simple_evaluate(
     model,
     model_args: Optional[Union[str, dict]] = None,
     image_src: Optional[str] = None,
+    image_src_split: Optional[str] = None,
     tasks: Optional[List[Union[str, dict, object]]] = None,
     num_fewshot: Optional[int] = None,
     batch_size: Optional[int] = None,
@@ -171,7 +172,8 @@ def simple_evaluate(
                     "batch_size": batch_size,
                     "max_batch_size": max_batch_size,
                     "device": device,
-                    "image_src": image_src
+                    "image_src": image_src,
+                    "image_src_split": image_src_split
                 },
             )
 
@@ -185,7 +187,8 @@ def simple_evaluate(
                     "batch_size": batch_size,
                     "max_batch_size": max_batch_size,
                     "device": device,
-                    "image_src": image_src
+                    "image_src": image_src,
+                    "image_src_split": image_src_split
                 },
             )
     else:

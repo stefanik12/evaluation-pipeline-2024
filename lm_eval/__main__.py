@@ -102,6 +102,12 @@ def setup_parser() -> argparse.ArgumentParser:
         help="HF dataset from which images are derived."
     )
     parser.add_argument(
+        "--image_src_split",
+        type=str,
+        default=None,
+        help="Train/validation/test split from which images are derived in image_src."
+    )
+    parser.add_argument(
         "--batch_size",
         "-b",
         type=str,
@@ -352,6 +358,7 @@ def cli_evaluate(args: Union[argparse.Namespace, None] = None) -> None:
         model_args=args.model_args,
         tasks=task_names,
         image_src=args.image_src,
+        image_src_split=args.image_src_split,
         num_fewshot=args.num_fewshot,
         batch_size=args.batch_size,
         max_batch_size=args.max_batch_size,
@@ -397,10 +404,11 @@ def cli_evaluate(args: Union[argparse.Namespace, None] = None) -> None:
 
             if args.log_samples:
                 for task_name, config in results["configs"].items():
-                    output_name = "{}_{}".format(
-                        re.sub(r"[\"<>:/\|\\?\*\[\]]+", "__", args.model_args),
-                        task_name,
-                    )
+                    # output_name = "{}_{}".format(
+                    #     re.sub(r"[\"<>:/\|\\?\*\[\]]+", "__", args.model_args),
+                    #     task_name,
+                    # )
+                    output_name = f"{task_name}_results"
                     filename = path.joinpath(f"{output_name}.jsonl")
                     samples_dumped = json.dumps(
                         samples[task_name],
