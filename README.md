@@ -39,6 +39,8 @@ On both pages, make sure you're logged in to your HuggingFace account, and reque
 
 For DevBench data, run `devbench/download_data.sh` from the root directory of this repository.
 
+For EWoK data, run `ewok/dl_and_filter.py` from the root directory of this repository.
+
 ## Evaluation 
 This year, we provide different sets of evaluation tasks for different tracks.
 
@@ -129,7 +131,7 @@ The LTG-BERT scores here are lower than expected given that this was last year's
 
 **Strict Track (100M)**
 
-| | BLiMP | BLiMP Supplement | EWoK | GLUE | *Macroaverage* |
+| Model | BLiMP | BLiMP Supplement | EWoK | GLUE | *Macroaverage* |
 | --- | --- | --- | --- | --- | --- |
 | BabyLlama | 73.1 | 60.6 | 52.1 | 69.0 | 63.7 |
 | LTG-BERT | 69.2 | 66.5 | 51.9 | 68.4 | 64.0 |
@@ -138,12 +140,12 @@ The LTG-BERT scores here are lower than expected given that this was last year's
 
 Here, we show the performance of the Flamingo and GIT baselines on all text-only *and* multimodal tasks. We also show how performance changes on the multimodal tasks when images are not provided to the model during evaluation (i.e., we use the same trained text-and-image model, but modify the evaluation setup to remove any visual information).
 
-| | BLiMP | BLiMP Supplement | EWoK | GLUE | *Text Macroaverage* | 
+| Model | BLiMP | BLiMP Supplement | EWoK | GLUE | *Text Macroaverage* | 
 | --- | --- | --- | --- | --- | --- |
 | Flamingo | 70.9 | 65.0 | 52.7 | 69.5 | 64.5 |
 | GIT | 65.2 | 77.7 | 52.4 | 68.3 | 62.2 |
 
-| | Winoground | VQA | DevBench | *Vision Macroaverage* |
+| Model | Winoground | VQA | DevBench | *Vision Macroaverage* |
 | --- | --- | --- | --- | --- |
 | Flamingo | 51.6 | 52.3 | 60.1 | 54.7 |
 | Flamingo (no vision) | 50.0 | 45.0 | - | 47.5(*) |
