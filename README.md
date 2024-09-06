@@ -159,6 +159,16 @@ You will upload your models and your models' predictions on the evaluation tasks
 
 To collect your results into the expected format, use `collect_results.py`. This will produce a Gzipped JSON file containing your model's predictions for all tasks. It also runs a simple verification to make sure you've included predictions for all examples for all tasks.
 
+**If you're submitting to the text-only track, you can use the following to collect your results:**
+```
+python collect_results.py <name_of_model>
+```
+Where `<name_of_model>` usually corresponds to the part of your model's name after the final "/" (i.e., the directory name where your results are being saved under `results/<task_name>`). For example, for the `babylm/git-2024` baseline, this would be `git-2024`.
+
+**If you're submitting to the multimodal track, add the `--include_vision_tasks` argument to the `collect_results.py` command.**
+
+If you chose to use LoRA instead of fine-tuning for (Super)GLUE, add the `--glue_lora` argument to the `collect_reuslts.py` command.
+
 Note that you don't have to use this script to collect your results if you've been using an alternate evaluation setup! Also note that the JSON doesn't necessarily need to be Gzipped. Thus, if you'd like to see the exact format you need to put your results into, you may unzip the sample JSONs provided here and inspect them.
 
 ### Text-only tasks
