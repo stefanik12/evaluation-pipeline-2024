@@ -7,6 +7,10 @@ BSZ=${4:-64}            # default: 64
 MAX_EPOCHS=${5:-10}     # default: 10
 SEED=${6:-12}           # default: 12
 
+# NOTE: if you've already run finetuning and just want to generate predictions,
+# you can set `--model_name_or_path "results/finetune/$model_basename/$TRAIN_NAME/"`
+# and remove the `--do_train` and `--do_eval` arguments.
+
 model_basename=$(basename $MODEL_PATH)
 for task in {boolq,cola,mnli,mnli-mm,mrpc,multirc,qnli,qqp,rte,sst2,wsc}; do
 	if [[ $task = "mnli-mm" ]]; then
