@@ -680,12 +680,14 @@ def main():
         tasks = [data_args.task_name]
         if data_args.task_name == "mnli":
             tasks.append("mnli-mm")
-            predict_datasets.append(raw_datasets["test_mismatched"])
+            predict_dataset.append(raw_datasets["test_mismatched"])
 
         # Removing the `label` columns because it contains -1 and Trainer won't like that.
         predict_dataset = predict_dataset.remove_columns("label")
         predictions = trainer.predict(predict_dataset, metric_key_prefix="predict").predictions
-        predictions = np.squeeze(predictions) if is_regression else np.argmax(predictions[0], axis=1)
+        if isinstance(predictions, tuple):
+            predictions = predictions[0]
+        predictions = np.squeeze(predictions) if is_regression else np.argmax(predictions, axis=1)
 
         output_predict_file = os.path.join(training_args.output_dir, f"predictions.txt")
         # if trainer.is_world_process_zero():
