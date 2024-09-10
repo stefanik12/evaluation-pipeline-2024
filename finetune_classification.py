@@ -29,6 +29,7 @@ import numpy as np
 from datasets import load_dataset
 from sklearn.metrics import f1_score, matthews_corrcoef
 
+import torch
 import transformers
 from transformers import (
     AutoConfig,
@@ -573,7 +574,8 @@ def main():
     # predictions and label_ids field) and has to return a dictionary string to float.
     def compute_metrics(p: EvalPrediction):
         preds = p.predictions[0] if isinstance(p.predictions, tuple) else p.predictions
-        preds = np.squeeze(preds) if is_regression else np.argmax(preds, axis=1)
+        if len(preds.shape) >= 2:
+            preds = np.squeeze(preds) if is_regression else np.argmax(preds, axis=1)
         if data_args.task_name is not None:
             result = metric.compute(predictions=preds, references=p.label_ids)
             if len(result) > 1:
@@ -587,6 +589,18 @@ def main():
                     "mcc": matthews_corrcoef(y_true=p.label_ids, y_pred=preds)}
         else:
             return {"accuracy": (preds == p.label_ids).astype(np.float32).mean().item()}
+
+    def preprocess_logits_for_metrics(logits, labels):
+        """
+        Original Trainer may have a memory leak. 
+        This is a workaround to avoid storing too many tensors that are not needed.
+        """
+        if type(logits) == tuple:
+            logits = logits[0]
+        pred_ids =  torch.argmax(logits, dim=-1)
+        if labels is None:
+            labels = torch.full((logits.shape[0],), -2)
+        return logits, labels
 
     # Data collator will default to DataCollatorWithPadding when the tokenizer is passed to Trainer, so we change it if
     # we already did the padding.
@@ -613,6 +627,7 @@ def main():
         train_dataset=train_dataset if training_args.do_train else None,
         eval_dataset=eval_dataset if training_args.do_eval else None,
         compute_metrics=compute_metrics,
+        preprocess_logits_for_metrics=preprocess_logits_for_metrics,
         tokenizer=tokenizer,
         data_collator=data_collator,
         callbacks = callbacks,
