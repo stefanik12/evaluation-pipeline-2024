@@ -197,14 +197,33 @@ if __name__ == "__main__":
         trainer.train()
         trainer.save_model(output_dir)
     
-    metrics = trainer.evaluate(eval_dataset=eval_dataset)
-    trainer.save_metrics("eval", metrics)
-    if args.do_predict:
-        predictions, labels, metrics = trainer.predict(eval_dataset, metric_key_prefix="predict")
-        predictions = np.argmax(predictions, axis=1)
-        print(predictions)
-        output_predict_file = os.path.join(output_dir, "predictions.txt")
-        with open(output_predict_file, "w") as writer:
-            writer.write("index\tprediction\n")
-            for index, item in enumerate(predictions):
-                writer.write(f"{index}\t{item}\n")
+    print(args.task)
+    if args.task == "mnli":
+        for eval_task in eval_dataset:
+            metrics = trainer.evaluate(eval_dataset=eval_dataset[eval_task])
+            trainer.save_metrics("eval", metrics)
+            if args.do_predict:
+                predictions, labels, metrics = trainer.predict(eval_dataset[eval_task], metric_key_prefix="predict")
+                predictions = np.argmax(predictions, axis=1)
+                if eval_task == "mnli-matched":
+                    output_predict_file = os.path.join(output_dir, "predictions.txt")
+                else:
+                    mnli_mm_output_dir = output_dir.replace("mnli", "mnli-mm")
+                    if not os.path.exists(mnli_mm_output_dir):
+                        os.makedirs(mnli_mm_output_dir)
+                    output_predict_file = os.path.join(mnli_mm_output_dir, "predictions.txt")
+                with open(output_predict_file, "w") as writer:
+                    writer.write("index\tprediction\n")
+                    for index, item in enumerate(predictions):
+                        writer.write(f"{index}\t{item}\n")
+    else:
+        metrics = trainer.evaluate(eval_dataset=eval_dataset)
+        trainer.save_metrics("eval", metrics)
+        if args.do_predict:
+            predictions, labels, metrics = trainer.predict(eval_dataset, metric_key_prefix="predict")
+            predictions = np.argmax(predictions, axis=1)
+            output_predict_file = os.path.join(output_dir, "predictions.txt")
+            with open(output_predict_file, "w") as writer:
+                writer.write("index\tprediction\n")
+                for index, item in enumerate(predictions):
+                    writer.write(f"{index}\t{item}\n")
