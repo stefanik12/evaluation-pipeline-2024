@@ -197,7 +197,7 @@ if __name__ == "__main__":
         trainer.train()
         trainer.save_model(output_dir)
     
-    print(args.task)
+    # if task is MNLI, run two separate rounds of prediction: one for mnli, one for mnli-mm
     if args.task == "mnli":
         for eval_task in eval_dataset:
             metrics = trainer.evaluate(eval_dataset=eval_dataset[eval_task])
@@ -216,6 +216,7 @@ if __name__ == "__main__":
                     writer.write("index\tprediction\n")
                     for index, item in enumerate(predictions):
                         writer.write(f"{index}\t{item}\n")
+    # one prediction run
     else:
         metrics = trainer.evaluate(eval_dataset=eval_dataset)
         trainer.save_metrics("eval", metrics)
