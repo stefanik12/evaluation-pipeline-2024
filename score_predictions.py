@@ -73,8 +73,7 @@ def score_devbench(predictions):
         if subtask == "sem-things":
             human_data = scipy.io.loadmat("evaluation_data/devbench/evals/sem-things/spose_similarity.mat")
             human_data = human_data["spose_sim"]
-            res_mat = cosine_similarity(results)
-            sim = rsa(human_data, res_mat)
+            sim = rsa(human_data, results)
             subtask_scores[subtask] = sim
         elif subtask == "gram-trog":
             human_data = pd.read_csv("evaluation_data/devbench/evals/gram-trog/human.csv")
