@@ -136,7 +136,8 @@ if __name__ == "__main__":
                     score_rows.append([subtask, acc, kl_metric])
                 else:
                     human_sims.append(scores[subtask])
-                    score_rows.append([subtask, "N/A", scores[subtask]])
+                    accs.append(scores[subtask])
+                    score_rows.append([subtask, scores[subtask], scores[subtask]])
             avg_acc = np.mean(accs)
             avg_human_sim = np.mean(human_sims)
             score_rows.append(["*Average*", f"{avg_acc:.3f}", f"{avg_human_sim:.3f}"])
