@@ -118,23 +118,23 @@ For the strict and strict-small tracks, we release [BabyLlama](https://aclanthol
 
 For the multimodal tracks, we release [Flamingo](https://proceedings.neurips.cc/paper_files/paper/2022/file/960a172bc7fbf0177ccccbb411a7d800-Paper-Conference.pdf) and [GIT](https://openreview.net/pdf?id=b4tMhpN0JC) baselines.
 
-Here are scores for each model on each evaluation task. Each task score is an unweighted mean of each subtask score within that task. We also show macroaverages, which are simply means of each task score (i.e., means across a row of the table). NOTE: for GLUE, we average *accuracies* for all tasks except QQP and MRPC (where we use F1 scores), and CoLA (where we use the Matthews correlation coefficient).
+Here are scores for each model on each evaluation task. Each task score is an unweighted mean of each subtask score within that task. We also show macroaverages, which are simply means of each task score (i.e., means across a row of the table). NOTE: for GLUE, we average *accuracies* for all tasks except QQP and MRPC (where we use F1 scores), and CoLA (where we use the Matthews correlation coefficient). See end of README for more detailed score breakdowns.
 
 **Strict-small Track (10M)**
 
 | Model | BLiMP | BLiMP Supplement | EWoK | GLUE | *Macroaverage* |
 | --- | --- | --- | --- | --- | --- |
-| BabyLlama | 69.8 | 59.5 | 50.7 | 63.3 | 60.8 |
-| LTG-BERT | 60.6 | 60.8 | 48.9 | 60.3 | 57.7 |
+| BabyLlama | 69.8 | 59.5 | 50.7 | 63.3 | *60.8* |
+| LTG-BERT | 60.6 | 60.8 | 48.9 | 60.3 | *57.7* |
 
-The LTG-BERT scores here are lower than expected given that this was last year's winning system. We believe this is because of our choice of hyperparameters---specifically, the number of epochs: we trained all models for approximately 20 epochs. LTG-BERT benefits from training for many more epochs than other models can feasibly train for without overfitting, so perhaps it would perform better with longer training. This is somewhat supported by its results on the Strict track, where the same number of epochs corresponds to many more training steps:
+The LTG-BERT scores here are lower than expected given that this was last year's winning system. We believe this is because of our choice of hyperparameters---specifically, the number of epochs: we trained all models for approximately 20 epochs. LTG-BERT benefits from training for many more epochs than other models can feasibly train for without overfitting, so perhaps it would perform better with longer training. This is somewhat supported by its results on the Strict track, where the same number of epochs corresponds to many more training steps.
 
 **Strict Track (100M)**
 
 | Model | BLiMP | BLiMP Supplement | EWoK | GLUE | *Macroaverage* |
 | --- | --- | --- | --- | --- | --- |
-| BabyLlama | 73.1 | 60.6 | 52.1 | 69.0 | 63.7 |
-| LTG-BERT | 69.2 | 66.5 | 51.9 | 68.4 | 64.0 |
+| BabyLlama | 73.1 | 60.6 | 52.1 | 69.0 | *63.7* |
+| LTG-BERT | 69.2 | 66.5 | 51.9 | 68.4 | *64.0* |
 
 **Multimodal Track**
 
@@ -142,15 +142,15 @@ Here, we show the performance of the Flamingo and GIT baselines on all text-only
 
 | Model | BLiMP | BLiMP Supplement | EWoK | GLUE | *Text Macroaverage* | 
 | --- | --- | --- | --- | --- | --- |
-| Flamingo | 70.9 | 65.0 | 52.7 | 69.5 | 64.5 |
-| GIT | 65.2 | 77.7 | 52.4 | 68.3 | 62.2 |
+| Flamingo | 70.9 | 65.0 | 52.7 | 69.5 | *64.5* |
+| GIT | 65.2 | 62.7 | 52.4 | 65.5 | *61.5* |
 
 | Model | Winoground | VQA | DevBench | *Vision Macroaverage* |
 | --- | --- | --- | --- | --- |
-| Flamingo | 51.6 | 52.3 | 60.1 | 54.7 |
-| Flamingo (no vision) | 50.0 | 45.0 | - | 47.5(*) |
-| GIT | 55.5 | 54.1 | 50.5 | 53.4 |
-| GIT (no vision) | 50.0 | 48.4 | - | 49.2(*) |
+| Flamingo | 51.6 | 52.3 | 59.5 | *54.5* |
+| Flamingo (no vision) | 50.0 | 45.0 | - | *47.5(\*)* |
+| GIT | 55.5 | 54.1 | 51.1 | *53.6* |
+| GIT (no vision) | 50.0 | 48.4 | - | *49.2(\*)* |
 
 (*) Not directly comparable to other macroaverages, since DevBench scores without vision are not well-defined. These rows are more useful as comparison points for Winoground and VQA with and without visual signals.
 
@@ -346,3 +346,87 @@ Please cite both of the following papers if you use this repository in your work
   url          = {https://zenodo.org/records/10256836}
 }
 ```
+
+## Detailed Score Breakdown
+
+**Strict-small Track (10M)**
+
+*GLUE (Default: Acc.)*
+| Model | BoolQ | CoLA (MCC) | MNLI | MNLI-mm | MRPC (F1) | MultiRC | QNLI | QQP (F1) | RTE | SST-2 | WSC | *Macroaverage* |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| BabyLlama | 65.0 | 2.2 | 72.4 | 74.2 | 82.0 | 60.1 | 82.8 | 83.6 | 49.6 | 86.2 | 38.5 | *63.3* |
+| LTG-BERT | 68.8 | 0.0 | 68.9 | 68.9 | 82.2 | 58.5 | 76.5 | 34.2 | 58.3 | 85.1 | 61.5 | *60.3* |
+
+
+*BLiMP Supplement (Acc.)*
+| Model | Hypernym | QA Congruence (easy) | QA Congruence (tricky) | Subj.-Aux. Inversion | Turn Taking | *Macroaverage* |
+| --- | --- | --- | --- | --- | --- | --- |
+| BabyLlama | 49.6 | 54.7 | 41.2 | 86.0 | 66.1 | *59.5* |
+| LTG-BERT | 54.2 | 62.5 | 49.1 | 79.9 | 58.2 | *60.8* |
+
+
+*EWoK (Acc.)*
+| Model | Agent Properties | Material Dynamics | Material Properties | Physical Dynamics | Physical Interactions | Physical Relations | Quantitative Properties | Social Interactions | Social Properties | Social Relations | Spatial Relations | *Macroaverage* |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| BabyLlama | 50.5 | 51.7 | 49.4 | 54.2 | 50.4 | 50.6 | 53.5 | 50.7 | 50.3 | 49.8 | 46.7 | *50.7* |
+| LTG-BERT | 50.2 | 51.0 | 45.3 | 42.5 | 49.1 | 51.0 | 48.1 | 51.7 | 53.4 | 50.6 | 45.3 | *48.9* |
+
+---
+**Strict Track (100M)**
+
+*GLUE (Default: Acc.)*
+| Model | BoolQ | CoLA (MCC) | MNLI | MNLI-mm | MRPC (F1) | MultiRC | QNLI | QQP (F1) | RTE | SST-2 | WSC | *Macroaverage* |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| BabyLlama | 66.1 | 37.3 | 75.6 | 76.2 | 86.8 | 62.1 | 83.1 | 84.5 | 60.4 | 88.3 | 38.5 | *69.0* |
+| LTG-BERT | 61.7 | 34.6 | 77.7 | 78.1 | 83.1 | 52.6 | 78.2 | 86.7 | 46.8 | 91.5 | 61.5 | *68.4* |
+
+
+*BLiMP Supplement (Acc.)*
+| Model | Hypernym | QA Congruence (easy) | QA Congruence (tricky) | Subj.-Aux. Inversion | Turn Taking | *Macroaverage* |
+| --- | --- | --- | --- | --- | --- | --- |
+| BabyLlama | 45.6 | 56.2 | 44.8 | 83.9 | 72.5 | *60.6* |
+| LTG-BERT | 55.0 | 75.0 | 53.3 | 87.5 | 61.4 | *66.5* |
+
+
+*EWoK (Acc.)*
+| Model | Agent Properties | Material Dynamics | Material Properties | Physical Dynamics | Physical Interactions | Physical Relations | Quantitative Properties | Social Interactions | Social Properties | Social Relations | Spatial Relations | *Macroaverage* |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| BabyLlama | 50.1 | 55.5 | 50.0 | 57.5 | 51.4 | 50.5 | 56.7 | 52.7 | 49.7 | 50.0 | 49.0 | *52.1* | 
+| LTG-BERT | 50.1 | 55.8 | 50.6 | 58.3 | 48.9 | 50.9 | 53.8 | 51.4 | 50.8 | 53.8 | 51.4 | 51.2 | 50.8 | 49.2 | *51.9* |
+
+---
+**Multimodal Track**
+
+*GLUE (Default: Acc.)*
+| Model | BoolQ | CoLA (MCC) | MNLI | MNLI-mm | MRPC (F1) | MultiRC | QNLI | QQP (F1) | RTE | SST-2 | WSC | *Macroaverage* |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Flamingo | 69.1 | 36.7 | 75.8 | 76.4 | 84.2 | 60.5 | 83.8 | 85.1 | 60.4 | 90.4 | 42.3 | *69.5* |
+| GIT | 67.0 | 0.0 | 75.2 | 74.5 | 82.2 | 58.6 | 81.9 | 84.7 | 62.6 | 88.8 | 45.3 | *65.5* |
+
+*BLiMP Supplement (Acc.)*
+| Model | Hypernym | QA Congruence (easy) | QA Congruence (tricky) | Subj.-Aux. Inversion | Turn Taking | *Macroaverage* |
+| --- | --- | --- | --- | --- | --- | --- |
+| Flamingo | 48.8 | 75.0 | 43.6 | 86.2 | 71.4 | *65.0* |
+| GIT | 48.9 | 67.2 | 49.7 | 86.6 | 61.1 | *62.7* |
+
+*EWoK (Acc.)*
+| Model | Agent Properties | Material Dynamics | Material Properties | Physical Dynamics | Physical Interactions | Physical Relations | Quantitative Properties | Social Interactions | Social Properties | Social Relations | Spatial Relations | *Macroaverage* |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Flamingo | 50.8 | 61.0 | 55.3 | 53.3 | 50.9 | 50.1 | 52.5 | 54.4 | 49.4 | 49.6 | 52.2 | *52.7* |
+| GIT | 51.0 | 61.9 | 51.2 | 54.2 | 50.2 | 49.9 | 52.5 | 51.4 | 52.4 | 50.2 | 51.6 | *52.4* |
+
+
+*DevBench*
+| Model | THINGS (RSA) | TROG (Acc.) | Visual Vocab (Acc.) | *Macroaverage* |
+| --- | --- | --- | --- | --- |
+| Flamingo | 46.5 | 51.3 | 80.7 | *59.5* |
+| GIT | 32.6 | 38.2 | 82.4 | *51.1* |
+
+| Model | THINGS (RSA) | TROG (Human sim.) | Visual Vocab (Human sim.) | *Macroaverage* |
+| --- | --- | --- | --- | --- |
+| Flamingo | 46.5 | 47.7 | 75.2 | *56.4* |
+| GIT | 32.6 | 44.7 | 75.3 | *50.8* |
+
+The human similarity scores are computed as `exp(-D)`, where `D` is the KL divergence from human response probability distributions to model logits. We exponentiate the negative value to normalize the divergence into a metric within the range [0,1], and to ensure that higher values are better. Note that the macroaverages reported in **Baselines** are from the first table containing accuracies and the THINGS RSA.
+
+Winoground and VQA do not contain subtasks, so scores for these can be found above in the **Baselines** section.
