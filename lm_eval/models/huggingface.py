@@ -609,7 +609,7 @@ class HFLM(TemplateLM):
             self._model = self.AUTO_MODEL_CLASS.from_pretrained(
                 pretrained,
                 revision=revision,
-                torch_dtype=get_dtype(dtype),
+                torch_dtype=get_dtype(dtype),  # TODO: maybe fix
                 trust_remote_code=trust_remote_code,
                 **model_kwargs,
             )
@@ -1068,8 +1068,8 @@ class HFLM(TemplateLM):
         re_ord = Collator(
             requests,
             sort_fn=_collate,
-            # group_by="contexts"
-            group_by="gen_kwargs"
+            group_by="contexts"
+            # group_by="gen_kwargs"
             if self.AUTO_MODEL_CLASS == transformers.AutoModelForCausalLM
             and self.logits_cache
             else None,
