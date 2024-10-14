@@ -1068,8 +1068,8 @@ class HFLM(TemplateLM):
         re_ord = Collator(
             requests,
             sort_fn=_collate,
-            group_by="contexts"
-            # group_by="gen_kwargs"
+            # group_by="contexts"  # TODO: switch group_by to fix batching
+            group_by="gen_kwargs"
             if self.AUTO_MODEL_CLASS == transformers.AutoModelForCausalLM
             and self.logits_cache
             else None,
