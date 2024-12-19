@@ -37,6 +37,7 @@ def simple_evaluate(
     image_src: Optional[str] = None,
     image_src_split: Optional[str] = None,
     tasks: Optional[List[Union[str, dict, object]]] = None,
+    debug_on_first_subtask: bool = False,
     num_fewshot: Optional[int] = None,
     batch_size: Optional[int] = None,
     max_batch_size: Optional[int] = None,
@@ -213,6 +214,10 @@ def simple_evaluate(
         task_manager = TaskManager(verbosity)
 
     task_dict = get_task_dict(tasks, task_manager)
+    if debug_on_first_subtask:
+        eval_logger.warning("Debug mode: Evaluating only on first task!")
+        task_dict = {k: v for k, v in [next(iter(task_dict.items()))]}
+
     for task_name in task_dict.keys():
         task_obj = task_dict[task_name]
         if isinstance(task_obj, tuple):
